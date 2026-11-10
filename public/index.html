@@ -12,17 +12,19 @@
 <article class="panel"><div class="eyebrow" style="margin-bottom:14px">AT A GLANCE</div><div class="tiles">
 <div class="tile"><div class="eyebrow">MOVEMENT</div><strong id="rate">—</strong><small>people per 30 min</small></div>
 <div class="tile"><div class="eyebrow">TYPICAL NOW</div><strong id="usual">—</strong><small id="usualNote">same weekday/hour</small></div>
-<div class="tile"><div class="eyebrow">NEXT HOUR</div><strong id="next">—</strong><small id="nextNote">exploratory forecast</small></div>
+<div class="tile"><div class="eyebrow">IN 60 MIN</div><strong id="next">—</strong><small id="nextNote">exploratory forecast</small></div>
 <div class="tile"><div class="eyebrow">READINGS</div><strong id="points">—</strong><small id="coverage">historical dataset</small></div>
 </div></article></section>
 <div class="section-title"><h2>Occupancy analytics</h2><p>Observed movement and what might happen next.</p></div>
-<section class="charts">
-<article class="panel"><div class="charthead"><h3>Today’s occupancy</h3><span>OBSERVED</span></div><svg class="chart" id="actualChart" viewBox="0 0 600 230" preserveAspectRatio="none" aria-label="Observed gym occupancy today"></svg><div class="chartnote" id="actualNote">Waiting for readings.</div><div class="legend"><span><i></i>Actual headcount</span></div></article>
-<article class="panel"><div class="charthead"><h3>Next hour</h3><span id="forecastType">EXPLORATORY</span></div><svg class="chart" id="forecastChart" viewBox="0 0 600 230" preserveAspectRatio="none" aria-label="Next-hour occupancy forecast"></svg><div class="chartnote" id="forecastNote">Preparing forecast.</div><div class="legend"><span><i class="forecast"></i>Projected count</span><span>Shaded = illustrative range</span></div></article>
+<section class="charts combined">
+<article class="panel"><div class="charthead"><h3>Today &amp; through closing</h3><span id="forecastType">OBSERVED + EXPLORATORY FORECAST</span></div>
+<svg class="chart" id="dayChart" viewBox="0 0 600 250" preserveAspectRatio="none" role="img" aria-label="Today's occupancy history and forecast to closing with illustrative uncertainty band"></svg>
+<div class="chartnote" id="dayNote">Waiting for readings.</div>
+<div class="legend"><span><i></i>Observed count</span><span><i class="forecast"></i>Forecast to closing</span><span><i class="band"></i>Illustrative spread, not confidence interval</span></div></article>
 </section>
 <div class="tabs"><button class="tab active" data-tab="insights">Insights</button><button class="tab" data-tab="patterns">Weekly patterns</button><button class="tab" data-tab="best">Best times</button></div>
 <section class="view active" id="insights"><article class="panel"><div class="eyebrow">WHAT THE NUMBERS MEAN</div><p class="insight" id="insight">Analyzing today's readings.</p><div class="fine" id="logged">Last logged reading —</div></article></section>
 <section class="view" id="patterns"><article class="panel"><div class="charthead"><h3>Average occupancy by weekday and hour</h3><span>HISTORICAL</span></div><p class="fine">Empty cells indicate no recorded history.</p><div class="heat" id="heatmap"></div></article></section>
-<section class="view" id="best"><article class="panel"><div class="charthead"><h3>Historically quieter hours</h3><span>EARLY DATA IS PROVISIONAL</span></div><div class="best" id="besttimes"></div></article></section>
-<footer><span>NOLAN HASTING-TEST</span><span>Collects once per minute · forecasts are exploratory · independent project</span></footer>
+<section class="view" id="best"><article class="panel"><div class="charthead"><h3>Upcoming quieter hours today</h3><span>HISTORICAL · PROVISIONAL</span></div><div class="best" id="besttimes"></div></article></section>
+<footer><span>NOLAN HASTING-TEST</span><span>Collects once per minute · forecasts are exploratory · 100 is policy reference, not a hard observed cap · independent project</span></footer>
 </main><script defer src="/app.js"></script></body></html>
