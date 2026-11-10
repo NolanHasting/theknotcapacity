@@ -7,7 +7,7 @@
   "rewrites":[{"source":"/api/status","function":{"functionId":"getOccupancy","region":"us-east1"}}],
   "headers":[
    {"source":"/api/**","headers":[{"key":"Cache-Control","value":"no-store"}]},
-   {"source":"**/*.@(js|css|png)","headers":[{"key":"Cache-Control","value":"public,max-age=300"}]},
+   {"source":"**/*.@(js|css|png)","headers":[{"key":"Cache-Control","value":"no-cache"}]},
    {"source":"/index.html","headers":[{"key":"Cache-Control","value":"no-cache"}]}
   ]
  }
