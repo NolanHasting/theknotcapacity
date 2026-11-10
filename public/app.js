@@ -1,100 +1,112 @@
-
+'use strict';
 const $=id=>document.getElementById(id);
-let busy=false;
+let busy=false,lastData=null;
 function time(s){return s?new Date(s).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'—';}
-function grid(){return [35,119,201].map(y=>'<line x1="42" y1="'+y+'" x2="590" y2="'+y+'" stroke="#344037"/>').join('');}
-function emptyChart(id,text){$(id).innerHTML=grid()+'<text x="48" y="115" fill="#a5b1a6" font-size="13">'+text+'</text>';}
-function actualChart(d){
- const history=(d.todayHistory||[]).slice();
- if(d.open&&typeof d.count==='number'&&(!history.length||Date.parse(d.updated)-Date.parse(history[history.length-1].timestamp)>60000))
-   history.push({timestamp:d.updated,count:d.count});
- if(history.length<2){emptyChart('actualChart','Collecting today’s readings…');$('actualNote').textContent='At least two readings are needed.';return;}
- const max=Math.max(25,Math.ceil(Math.max(...history.map(p=>p.count))/10)*10);
- const start=Date.parse(history[0].timestamp),span=Math.max(1,Date.parse(history[history.length-1].timestamp)-start);
- const x=i=>42+(Date.parse(history[i].timestamp)-start)/span*548,y=v=>201-v/max*166;
- const line=history.map((p,i)=>(i?'L':'M')+x(i).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
- $('actualChart').innerHTML=grid()+'<path d="'+line+' L '+x(history.length-1)+' 201 L 42 201 Z" fill="#9fd39b" opacity=".11"/>'+
- '<path d="'+line+'" fill="none" stroke="#9fd39b" stroke-width="3" stroke-linecap="round"/>'+
- '<circle cx="'+x(history.length-1)+'" cy="'+y(history[history.length-1].count)+'" r="4" fill="#cbe789"/>'+
- '<text x="5" y="38" font-size="11" fill="#a5b1a6">'+max+'</text><text x="5" y="202" font-size="11" fill="#a5b1a6">0</text>'+
- '<text x="42" y="223" font-size="11" fill="#a5b1a6">'+time(history[0].timestamp)+'</text>'+
- '<text x="590" y="223" font-size="11" text-anchor="end" fill="#a5b1a6">'+time(history[history.length-1].timestamp)+'</text>';
- $('actualNote').textContent=(d.todayHistory||[]).length+' logged readings today · latest observed '+history[history.length-1].count;
-}
-function forecastChart(f){
- if(!f||!f.points||f.points.length<2){
-   emptyChart('forecastChart','Not enough observations yet.');
-   $('forecastNote').textContent='Forecast appears after recent movement or historical patterns are available.';
-   $('forecastType').textContent='WAITING';return;
+function hourLabel(h){return (h%12||12)+':00 '+(h<12?'AM':'PM');}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+const svg=(name,attr)=>`<${name} ${attr}/>`;
+function clearChart(text){$('dayChart').innerHTML='<text x="45" y="125" fill="#a5b1a6" font-size="13">'+esc(text)+'</text>';}
+function dayChart(d){
+ const history=(d.todayHistory||[]).filter(p=>Number.isFinite(p.count)&&Number.isFinite(Date.parse(p.timestamp))).sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
+ const forecast=d.dataState==='live'?d.forecast:null;
+ const points=(forecast&&forecast.points)||[];
+ if(!history.length){clearChart('Waiting for today’s observed readings…');$('dayNote').textContent='No readings logged today.';return;}
+ // The first recorded point determines the graph's left edge; all time spacing is real.
+ const start=Date.parse(history[0].timestamp),nowTs=Date.parse(d.sourceUpdated||d.updated);
+ const lastTs=Date.parse(history[history.length-1].timestamp);
+ const projected=points.map(p=>({...p,ts:nowTs+p.minutes*60000}));
+ const maxTs=projected.length?Math.max(lastTs,projected[projected.length-1].ts):lastTs;
+ const span=Math.max(60000,maxTs-start);
+ const all=[...history.map(p=>p.count),...projected.map(p=>p.high)];
+ const yMax=Math.max(25,Math.ceil(Math.max(100,...all)/10)*10),left=44,right=588,top=19,bottom=206;
+ const x=t=>left+(t-start)/span*(right-left),y=n=>bottom-n/yMax*(bottom-top);
+ let marks='';for(let i=0;i<=4;i++){
+  const v=Math.round(yMax*i/4),yy=y(v);
+  marks+=svg('line',`x1="${left}" y1="${yy.toFixed(1)}" x2="${right}" y2="${yy.toFixed(1)}" stroke="#344037"`);
+  marks+=`<text x="37" y="${(yy+4).toFixed(1)}" text-anchor="end" fill="#a5b1a6" font-size="10">${v}</text>`;
  }
- const p=f.points,max=Math.max(25,Math.ceil(Math.max(...p.map(v=>v.high))/10)*10);
- const x=i=>42+i/(p.length-1)*548,y=v=>201-v/max*166;
- const upper=p.map((v,i)=>(i?'L':'M')+x(i)+' '+y(v.high)).join(' ');
- const lower=p.slice().reverse().map((v,j)=>'L'+x(p.length-1-j)+' '+y(v.low)).join(' ');
- const line=p.map((v,i)=>(i?'L':'M')+x(i)+' '+y(v.count)).join(' ');
- $('forecastChart').innerHTML=grid()+'<path d="'+upper+' '+lower+' Z" fill="#cbe789" opacity=".14"/>'+
- '<path d="'+line+'" fill="none" stroke="#cbe789" stroke-width="3" stroke-dasharray="7 5"/>'+
- '<circle cx="42" cy="'+y(p[0].count)+'" r="4" fill="#9fd39b"/>'+
- '<circle cx="590" cy="'+y(p[p.length-1].count)+'" r="4.5" fill="#cbe789"/>'+
- '<text x="5" y="38" font-size="11" fill="#a5b1a6">'+max+'</text><text x="5" y="202" font-size="11" fill="#a5b1a6">0</text>'+
- '<text x="42" y="223" font-size="11" fill="#a5b1a6">NOW</text>'+
- '<text x="590" y="223" font-size="11" text-anchor="end" fill="#a5b1a6">+'+f.horizonMinutes+' MIN</text>';
- $('forecastType').textContent=f.confidence+' ESTIMATE';
- $('forecastNote').textContent='Projected '+f.projected+' ('+(f.change>=0?'+':'')+f.change+') · '+f.method+'. Uncertainty band is illustrative.';
+ const historyLine=history.map((p,i)=>((i&&Date.parse(p.timestamp)-Date.parse(history[i-1].timestamp)<=10*60000)?'L':'M')+x(Date.parse(p.timestamp)).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
+ let shapes=`<path d="${historyLine}" fill="none" stroke="#9fd39b" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+ if(projected.length>1){
+  const line=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
+  const upper=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.high).toFixed(2)).join(' ');
+  const lower=projected.slice().reverse().map(p=>'L'+x(p.ts).toFixed(2)+' '+y(p.low).toFixed(2)).join(' ');
+  shapes+=`<path d="${upper} ${lower} Z" fill="#cbe789" opacity=".15"/>`;
+  shapes+=`<path d="${line}" fill="none" stroke="#cbe789" stroke-width="2.6" stroke-dasharray="7 5"/>`;
+  const divider=x(nowTs);shapes+=svg('line',`x1="${divider.toFixed(2)}" y1="${top}" x2="${divider.toFixed(2)}" y2="${bottom}" stroke="#84998a" stroke-dasharray="3 6"`);
+  shapes+=`<text x="${Math.min(right-7,divider+6).toFixed(2)}" y="13" fill="#cbe789" font-size="10" text-anchor="${divider>right-65?'end':'start'}">NOW</text>`;
+ }
+ const ticks=[];for(let i=0;i<5;i++){
+  const ts=start+span*i/4;
+  ticks.push(`<text x="${(left+(right-left)*i/4).toFixed(1)}" y="232" fill="#a5b1a6" font-size="10" text-anchor="${i===0?'start':i===4?'end':'middle'}">${esc(time(new Date(ts).toISOString()))}</text>`);
+ }
+ $('dayChart').innerHTML=marks+shapes+ticks.join('');
+ $('forecastType').textContent=forecast?forecast.confidence+' ESTIMATE':'OBSERVED ONLY';
+ $('dayNote').textContent=history.length+' readings today'+(forecast?' · predicted at closing: '+forecast.closing+' · forecast is exploratory with an illustrative, uncalibrated spread.':' · forecast unavailable until live data is restored.');
 }
 function renderHeat(cells){
  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
  let html='<div></div>'+days.map(d=>'<div>'+d+'</div>').join('');
- for(let h=7;h<23;h++){html+='<div>'+(h%12||12)+(h<12?'a':'p')+'</div>';
+ for(let h=7;h<23;h++){
+  html+='<div>'+hourLabel(h).replace('00 ','')+'</div>';
   for(let d=0;d<7;d++){
    const v=(cells||[]).find(x=>x.dayIndex===d&&x.hour===h);
    const color=!v||v.average===null?'#252e27':v.average<=25?'#305a3b':v.average<=50?'#617c45':v.average<=75?'#94763f':'#994b46';
-   html+='<div class="cell" style="background:'+color+'" title="'+(v&&v.average!==null?days[d]+' '+h+':00 / '+v.average+' avg / '+v.samples+' readings':'No data')+'"></div>';
+   const title=v&&v.average!==null?`${days[d]} ${hourLabel(h)} · ${v.average} average · ${v.days||0} days · ${v.samples} readings`:'No data';
+   html+='<div class="cell" style="background:'+color+'" title="'+esc(title)+'"></div>';
   }
- }$('heatmap').innerHTML=html;
+ }
+ $('heatmap').innerHTML=html;
 }
 function renderBest(items){
- $('besttimes').innerHTML=items&&items.length?items.map(v=>'<div class="bestitem"><div class="eyebrow">'+v.day+' · '+(v.hour%12||12)+':00 '+(v.hour<12?'AM':'PM')+'</div><strong>'+v.average+'</strong><small>'+v.samples+' readings</small></div>').join(''):'<div class="fine">Collecting historical readings.</div>';
+ $('besttimes').innerHTML=items&&items.length?items.map(v=>'<div class="bestitem"><div class="eyebrow">'+esc(v.day)+' · '+esc(hourLabel(v.hour))+'</div><strong>'+v.average+' <small>typical people</small></strong><small>'+v.days+' separate day'+(v.days===1?'':'s')+' · '+v.samples+' readings</small><small class="reliability">'+(v.provisional?'Very early estimate':'Developing pattern')+'</small></div>').join(''):
+ '<div class="fine">No reliable upcoming historical slots yet. As additional days are recorded, quieter windows for the rest of today will appear here.</div>';
 }
 function render(d){
+ lastData=d;
+ const state=d.dataState||'offline',live=state==='live',delayed=state==='delayed',closed=state==='closed';
  const color=d.color||'#9fd39b';
- const age=(Date.now()-Date.parse(d.updated))/60000; const delayed=!Number.isFinite(age)||age>7;
- $('connection').textContent=delayed?'DELAYED':'LIVE';$('liveDot').style.background=delayed?'#f0c468':'#9fd39b';
- $('count').textContent=d.open?d.count:'—';$('status').textContent=d.label;$('status').style.color=color;
- $('open').textContent=d.open?'OPEN NOW':'CLOSED HOURS';
- $('trend').textContent=d.trendLabel||'—';$('trend').style.color=d.open?'#cbe789':'#a5b1a6';
- $('fill').style.width=d.open?Math.min(100,d.percent)+'%':'0%';$('fill').style.background=color;
- $('capacity').textContent=d.open?d.percent+'% of reference capacity':'Outside configured hours';
- $('updated').textContent='Checked '+time(d.updated);
- $('rate').textContent=d.trendPer30===null?'—':(d.trendPer30>0?'+':'')+Math.round(d.trendPer30);
- $('usual').textContent=d.typicalNow===null?'—':d.typicalNow;$('usualNote').textContent=d.typicalSamples+' matching readings';
- $('next').textContent=d.forecast?d.forecast.projected:'—';
- $('nextNote').textContent=d.forecast?d.forecast.confidence.toLowerCase()+' estimate':'not yet available';
- $('points').textContent=d.dataPoints;$('coverage').textContent=d.note||'historical readings';
- $('insight').textContent=d.insight+' '+(d.forecast?'The projection combines recent movement with historical data; it is not a guarantee.':'The forecast will appear as more history is collected.');
+ $('connection').textContent=state.toUpperCase();$('liveDot').style.background=live?'#9fd39b':delayed?'#f0c468':closed?'#98a29b':'#ff6c67';
+ $('count').textContent=closed||state==='offline'||!Number.isFinite(d.count)?'—':d.count;
+ $('status').textContent=closed?'CLOSED':live?d.label:delayed?'DELAYED':'OFFLINE';
+ $('status').style.color=live?color:delayed?'#f0c468':'#98a29b';
+ $('open').textContent=closed?'CLOSED HOURS':live?'OPEN NOW':delayed?'LAST KNOWN COUNT':'DATA UNAVAILABLE';
+ $('trend').textContent=live?(d.trendLabel||'LEARNING'):'—';$('trend').style.color=live?'#cbe789':'#a5b1a6';
+ $('fill').style.width=closed||state==='offline'||!Number.isFinite(d.percent)?'0%':Math.min(100,d.percent)+'%';$('fill').style.background=color;
+ $('capacity').textContent=closed?'Outside configured hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 policy reference':'—';
+ $('updated').textContent='Collected '+time(d.sourceUpdated);
+ $('rate').textContent=live&&Number.isFinite(d.trendPer30)?(d.trendPer30>0?'+':'')+Math.round(d.trendPer30):'—';
+ $('usual').textContent=d.typicalNow==null?'—':d.typicalNow;
+ $('usualNote').textContent=(d.typicalDays||0)+' matching days';
+ $('next').textContent=live&&d.forecast?d.forecast.projected:'—';
+ $('nextNote').textContent=live&&d.forecast?'exploratory · '+Math.min(60,d.forecast.horizonMinutes)+' min ahead':'not available';
+ $('points').textContent=d.dataPoints||0;$('coverage').textContent=d.note||'historical readings';
+ $('insight').textContent=(d.warning?d.warning+' ':'')+(d.insight||'')+(live&&d.forecast?' Projection combines smoothed movement with historical day-level averages and is not a guarantee.':'');
  $('logged').textContent='Last logged reading: '+time(d.lastLogged);
- actualChart(d);forecastChart(d.forecast);renderHeat(d.heatmap);renderBest(d.bestTimes);
+ dayChart(d);renderHeat(d.heatmap);renderBest(d.bestTimes);
 }
 function errorState(message){
+ lastData=null;
  $('connection').textContent='OFFLINE';$('liveDot').style.background='#ff6c67';
  $('status').textContent='OFFLINE';$('status').style.color='#ff6c67';$('count').textContent='—';
- $('open').textContent='DATA UNAVAILABLE';$('insight').textContent='Could not obtain a fresh reading: '+message;
+ $('open').textContent='DATA UNAVAILABLE';$('trend').textContent='—';$('fill').style.width='0%';
+ $('rate').textContent='—';$('next').textContent='—';$('usual').textContent='—';
+ $('updated').textContent='—';$('capacity').textContent='—';
+ $('insight').textContent='Unable to retrieve occupancy data: '+message;
+ $('dayNote').textContent='Data unavailable.';clearChart('Unable to load readings.');
+ $('besttimes').innerHTML='<div class="fine">No current recommendations.</div>';
+ $('heatmap').innerHTML='';
 }
-function refresh(){
+async function refresh(){
  if(busy)return;
- busy=true;
- $('refresh').disabled=true;
- const api='/api/status';
- const sep=api.indexOf('?')===-1?'?':'&';
- fetch(api+sep+'t='+Date.now(),{cache:'no-store',headers:{Accept:'application/json'}})
- .then(async res=>{
-   let data;
-   try{data=await res.json();}catch(_){throw Error('The Firebase API returned a non-JSON response. Check the function deployment.');}
-   if(!res.ok || !data || data.ok!==true)throw Error(data&&data.error||'Data is unavailable.');
-   render(data);
- })
- .catch(err=>errorState(err.message||String(err)))
- .finally(()=>{busy=false;$('refresh').disabled=false;});
+ busy=true;$('refresh').disabled=true;
+ try{
+  const res=await fetch('/api/status?t='+Date.now(),{cache:'no-store',headers:{Accept:'application/json'}});
+  let data;try{data=await res.json();}catch{throw Error('Firebase API returned non-JSON data.');}
+  if(!res.ok||!data||data.ok!==true)throw Error((data&&data.error)||'Data unavailable.');
+  render(data);
+ }catch(err){errorState(err.message||String(err));}
+ finally{busy=false;$('refresh').disabled=false;}
 }
 $('refresh').onclick=refresh;
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
