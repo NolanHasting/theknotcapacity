@@ -73,7 +73,7 @@ function render(d){
  $('open').textContent=closed?'CLOSED HOURS':live?'OPEN NOW':delayed?'LAST KNOWN COUNT':'DATA UNAVAILABLE';
  $('trend').textContent=live?(d.trendLabel||'LEARNING'):'—';$('trend').style.color=live?'#fff':'#aaa';
  $('fill').style.width=closed||state==='offline'||!Number.isFinite(d.percent)?'0%':Math.min(100,d.percent)+'%';$('fill').style.background=color;
- $('capacity').textContent=closed?'Outside configured hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 policy reference'+(d.count>100?' · above policy limit':''):'—';
+ $('capacity').textContent=closed?'Outside configured hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 max capacity'+(d.count>100?' · above policy limit':''):'—';
  $('updated').textContent=d.sourceUpdated?'Last received '+time(d.sourceUpdated):'No reading received';
  $('rate').textContent=live&&Number.isFinite(d.trendPer30)?(d.trendPer30>0?'+':'')+Math.round(d.trendPer30):'—';
  $('usual').textContent=d.typicalNow==null?'—':d.typicalNow;
