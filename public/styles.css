@@ -33,3 +33,9 @@ footer{margin-top:27px;border-top:1px solid var(--line);padding-top:18px;display
 
 /* Website-specific finishing touches */
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+.charts.combined{grid-template-columns:minmax(0,1fr)}
+.charts.combined .chart{height:310px}
+.legend i.band{height:10px;width:14px;background:rgba(203,231,137,.20);border:1px solid rgba(203,231,137,.50)}
+.bestitem small{display:block;margin-top:3px}.bestitem .reliability{color:var(--busy)}
+@media(max-width:800px){.charts.combined .chart{height:240px}}
