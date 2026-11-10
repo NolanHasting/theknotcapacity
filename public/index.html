@@ -1,10 +1,10 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#101511"><meta name="description" content="Independent climbing gym occupancy dashboard: current crowds, daily trends and exploratory next-hour estimates."><title>Climb Crowd | Independent Gym Occupancy</title>
+<meta name="theme-color" content="#000000"><meta name="description" content="Independent climbing gym occupancy dashboard: current crowds, daily trends and exploratory next-hour estimates."><title>Climb Crowd | Independent Gym Occupancy</title>
 <link rel="stylesheet" href="/styles.css"></head><body><main>
 <header><div class="brand"><img src="/logo.png" alt="The Knot climbing gym logo">
 <div><div class="brand-name">THE KNOT</div><div class="brand-sub">INDEPENDENT OCCUPANCY DASHBOARD</div></div></div>
-<div class="headright"><div class="connection"><i id="liveDot" class="dot"></i><span id="connection">CONNECTING</span></div><button class="refresh" id="refresh">Refresh ↻</button></div></header>
+<div class="headright"><div class="connection" role="status" aria-live="polite"><i id="liveDot" class="dot"></i><span id="connection">CONNECTING</span></div><button class="refresh" id="refresh">Refresh ↻</button></div></header>
 <section class="hero"><article class="panel">
 <div class="count-top"><div class="eyebrow">CURRENT OCCUPANCY</div><div class="eyebrow" id="open">—</div></div>
 <div class="big" id="count">—</div><div class="summary"><div class="status" id="status">Loading…</div><div class="trend" id="trend">—</div></div>
@@ -18,7 +18,7 @@
 <div class="section-title"><h2>Occupancy analytics</h2><p>Observed movement and what might happen next.</p></div>
 <section class="charts combined">
 <article class="panel"><div class="charthead"><h3>Today &amp; through closing</h3><span id="forecastType">OBSERVED + EXPLORATORY FORECAST</span></div>
-<svg class="chart" id="dayChart" viewBox="0 0 600 250" preserveAspectRatio="none" role="img" aria-label="Today's occupancy history and forecast to closing with illustrative uncertainty band"></svg>
+<div class="chart-scroll" role="region" aria-label="Scrollable occupancy timeline"><svg class="chart" id="dayChart" viewBox="0 0 600 250" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Today's occupancy history and forecast to closing with illustrative uncertainty band"></svg></div>
 <div class="chartnote" id="dayNote">Waiting for readings.</div>
 <div class="legend"><span><i></i>Observed count</span><span><i class="forecast"></i>Forecast to closing</span><span><i class="band"></i>Illustrative spread, not confidence interval</span></div></article>
 </section>
@@ -26,5 +26,5 @@
 <section class="view active" id="insights"><article class="panel"><div class="eyebrow">WHAT THE NUMBERS MEAN</div><p class="insight" id="insight">Analyzing today's readings.</p><div class="fine" id="logged">Last logged reading —</div></article></section>
 <section class="view" id="patterns"><article class="panel"><div class="charthead"><h3>Average occupancy by weekday and hour</h3><span>HISTORICAL</span></div><p class="fine">Empty cells indicate no recorded history.</p><div class="heat" id="heatmap"></div></article></section>
 <section class="view" id="best"><article class="panel"><div class="charthead"><h3>Upcoming quieter hours today</h3><span>HISTORICAL · PROVISIONAL</span></div><div class="best" id="besttimes"></div></article></section>
-<footer><span>NOLAN HASTING-TEST</span><span>Collects once per minute · forecasts are exploratory · 100 is policy reference, not a hard observed cap · independent project</span></footer>
+<footer><span>NOLAN HASTING</span><span>Collects once per minute · forecasts are exploratory · 100 is policy reference, not a hard observed cap · independent project</span></footer>
 </main><script defer src="/app.js"></script></body></html>

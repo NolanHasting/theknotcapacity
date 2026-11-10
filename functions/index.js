@@ -63,7 +63,7 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
  try{
   const p=L.parts(new Date());
   const [s,d,w]=await Promise.all([STATUS.get(),db.collection('days').doc(p.day).get(),WEEKLY.get()]);
-  if(!s.exists){res.status(503).json({ok:false,error:'Waiting for first scheduled reading.'});return;}
+  if(!s.exists){res.status(503).set('Cache-Control','no-store').json({ok:false,error:'No reading exists yet. Check that collectOccupancy is deployed, enabled, and running in Firebase Scheduler.'});return;}
   const status=s.data(),weekly=w.exists?w.data():{};
   let response=L.summarize(status,d.exists?d.data():{},weekly);
   const age=(Date.now()-Date.parse(status.sourceUpdated||''))/60000;
@@ -72,12 +72,15 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   response.dataState=!response.open?'closed':(Number.isFinite(age)&&age<=3&&!status.error?'live':
    (Number.isFinite(age)&&age<=30?'delayed':'offline'));
   response.fresh=response.dataState==='live';
+  response.lastSourceErrorAt=status.sourceErrorAt||null;
+  response.sourceHealth=status.error?'fetch_failed':'ok';
   response.ok=true; // A delayed response is valid JSON: render its warning, not an API error.
   if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';}
   if(response.dataState==='delayed')response.warning='Source reading delayed; last known count only.';
   if(response.dataState==='offline')response.warning='Source unavailable; last known count is not reliable.';
+  if(status.error&&response.dataState!=='closed')response.warning=(response.warning||'')+' Last collection error: '+String(status.error).slice(0,160);
   res.set('Cache-Control','no-store');
   res.set('X-Content-Type-Options','nosniff');
   res.json(response);
- }catch(e){logger.error('GET status failed',e);res.status(503).json({ok:false,error:'Service temporarily unavailable'});}
+ }catch(e){logger.error('GET status failed',e);res.status(503).set('Cache-Control','no-store').json({ok:false,error:'Backend could not read occupancy from Firestore. Check function logs and Firestore permissions.'});}
 });

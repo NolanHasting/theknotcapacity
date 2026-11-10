@@ -5,7 +5,7 @@ function time(s){return s?new Date(s).toLocaleTimeString([],{hour:'numeric',minu
 function hourLabel(h){return (h%12||12)+':00 '+(h<12?'AM':'PM');}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 const svg=(name,attr)=>`<${name} ${attr}/>`;
-function clearChart(text){$('dayChart').innerHTML='<text x="45" y="125" fill="#a5b1a6" font-size="13">'+esc(text)+'</text>';}
+function clearChart(text){$('dayChart').innerHTML='<text x="45" y="125" fill="#bfbfbf" font-size="13">'+esc(text)+'</text>';}
 function dayChart(d){
  const history=(d.todayHistory||[]).filter(p=>Number.isFinite(p.count)&&Number.isFinite(Date.parse(p.timestamp))).sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
  const forecast=d.dataState==='live'?d.forecast:null;
@@ -22,23 +22,23 @@ function dayChart(d){
  const x=t=>left+(t-start)/span*(right-left),y=n=>bottom-n/yMax*(bottom-top);
  let marks='';for(let i=0;i<=4;i++){
   const v=Math.round(yMax*i/4),yy=y(v);
-  marks+=svg('line',`x1="${left}" y1="${yy.toFixed(1)}" x2="${right}" y2="${yy.toFixed(1)}" stroke="#344037"`);
-  marks+=`<text x="37" y="${(yy+4).toFixed(1)}" text-anchor="end" fill="#a5b1a6" font-size="10">${v}</text>`;
+  marks+=svg('line',`x1="${left}" y1="${yy.toFixed(1)}" x2="${right}" y2="${yy.toFixed(1)}" stroke="#333"`);
+  marks+=`<text x="37" y="${(yy+4).toFixed(1)}" text-anchor="end" fill="#bfbfbf" font-size="10">${v}</text>`;
  }
  const historyLine=history.map((p,i)=>((i&&Date.parse(p.timestamp)-Date.parse(history[i-1].timestamp)<=10*60000)?'L':'M')+x(Date.parse(p.timestamp)).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
- let shapes=`<path d="${historyLine}" fill="none" stroke="#9fd39b" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+ let shapes=`<path d="${historyLine}" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
  if(projected.length>1){
   const line=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
   const upper=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.high).toFixed(2)).join(' ');
   const lower=projected.slice().reverse().map(p=>'L'+x(p.ts).toFixed(2)+' '+y(p.low).toFixed(2)).join(' ');
-  shapes+=`<path d="${upper} ${lower} Z" fill="#cbe789" opacity=".15"/>`;
-  shapes+=`<path d="${line}" fill="none" stroke="#cbe789" stroke-width="2.6" stroke-dasharray="7 5"/>`;
-  const divider=x(nowTs);shapes+=svg('line',`x1="${divider.toFixed(2)}" y1="${top}" x2="${divider.toFixed(2)}" y2="${bottom}" stroke="#84998a" stroke-dasharray="3 6"`);
-  shapes+=`<text x="${Math.min(right-7,divider+6).toFixed(2)}" y="13" fill="#cbe789" font-size="10" text-anchor="${divider>right-65?'end':'start'}">NOW</text>`;
+  shapes+=`<path d="${upper} ${lower} Z" fill="#fff" opacity=".15"/>`;
+  shapes+=`<path d="${line}" fill="none" stroke="#fff" stroke-width="2.6" stroke-dasharray="7 5"/>`;
+  const divider=x(nowTs);shapes+=svg('line',`x1="${divider.toFixed(2)}" y1="${top}" x2="${divider.toFixed(2)}" y2="${bottom}" stroke="#999" stroke-dasharray="3 6"`);
+  shapes+=`<text x="${Math.min(right-7,divider+6).toFixed(2)}" y="13" fill="#fff" font-size="10" text-anchor="${divider>right-65?'end':'start'}">NOW</text>`;
  }
  const ticks=[];for(let i=0;i<5;i++){
   const ts=start+span*i/4;
-  ticks.push(`<text x="${(left+(right-left)*i/4).toFixed(1)}" y="232" fill="#a5b1a6" font-size="10" text-anchor="${i===0?'start':i===4?'end':'middle'}">${esc(time(new Date(ts).toISOString()))}</text>`);
+  ticks.push(`<text x="${(left+(right-left)*i/4).toFixed(1)}" y="232" fill="#bfbfbf" font-size="10" text-anchor="${i===0?'start':i===4?'end':'middle'}">${esc(time(new Date(ts).toISOString()))}</text>`);
  }
  $('dayChart').innerHTML=marks+shapes+ticks.join('');
  $('forecastType').textContent=forecast?forecast.confidence+' ESTIMATE':'OBSERVED ONLY';
@@ -51,7 +51,7 @@ function renderHeat(cells){
   html+='<div>'+hourLabel(h).replace('00 ','')+'</div>';
   for(let d=0;d<7;d++){
    const v=(cells||[]).find(x=>x.dayIndex===d&&x.hour===h);
-   const color=!v||v.average===null?'#252e27':v.average<=25?'#305a3b':v.average<=50?'#617c45':v.average<=75?'#94763f':'#994b46';
+   const color=!v||v.average===null?'#161616':v.average<=25?'#1c643a':v.average<=50?'#427b49':v.average<=75?'#9b6c24':'#a53333';
    const title=v&&v.average!==null?`${days[d]} ${hourLabel(h)} · ${v.average} average · ${v.days||0} days · ${v.samples} readings`:'No data';
    html+='<div class="cell" style="background:'+color+'" title="'+esc(title)+'"></div>';
   }
@@ -65,16 +65,16 @@ function renderBest(items){
 function render(d){
  lastData=d;
  const state=d.dataState||'offline',live=state==='live',delayed=state==='delayed',closed=state==='closed';
- const color=d.color||'#9fd39b';
- $('connection').textContent=state.toUpperCase();$('liveDot').style.background=live?'#9fd39b':delayed?'#f0c468':closed?'#98a29b':'#ff6c67';
+ const color=d.color||'#70e6a2';
+ $('connection').textContent=state.toUpperCase();$('liveDot').style.background=live?'#70e6a2':delayed?'#ffc65c':closed?'#a0a0a0':'#ff6767';
  $('count').textContent=closed||state==='offline'||!Number.isFinite(d.count)?'—':d.count;
  $('status').textContent=closed?'CLOSED':live?d.label:delayed?'DELAYED':'OFFLINE';
- $('status').style.color=live?color:delayed?'#f0c468':'#98a29b';
+ $('status').style.color=live?color:delayed?'#ffc65c':'#ff6767';
  $('open').textContent=closed?'CLOSED HOURS':live?'OPEN NOW':delayed?'LAST KNOWN COUNT':'DATA UNAVAILABLE';
- $('trend').textContent=live?(d.trendLabel||'LEARNING'):'—';$('trend').style.color=live?'#cbe789':'#a5b1a6';
+ $('trend').textContent=live?(d.trendLabel||'LEARNING'):'—';$('trend').style.color=live?'#fff':'#aaa';
  $('fill').style.width=closed||state==='offline'||!Number.isFinite(d.percent)?'0%':Math.min(100,d.percent)+'%';$('fill').style.background=color;
- $('capacity').textContent=closed?'Outside configured hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 policy reference':'—';
- $('updated').textContent='Collected '+time(d.sourceUpdated);
+ $('capacity').textContent=closed?'Outside configured hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 policy reference'+(d.count>100?' · above policy limit':''):'—';
+ $('updated').textContent=d.sourceUpdated?'Last received '+time(d.sourceUpdated):'No reading received';
  $('rate').textContent=live&&Number.isFinite(d.trendPer30)?(d.trendPer30>0?'+':'')+Math.round(d.trendPer30):'—';
  $('usual').textContent=d.typicalNow==null?'—':d.typicalNow;
  $('usualNote').textContent=(d.typicalDays||0)+' matching days';
@@ -87,12 +87,12 @@ function render(d){
 }
 function errorState(message){
  lastData=null;
- $('connection').textContent='OFFLINE';$('liveDot').style.background='#ff6c67';
- $('status').textContent='OFFLINE';$('status').style.color='#ff6c67';$('count').textContent='—';
+ $('connection').textContent='OFFLINE';$('liveDot').style.background='#ff6767';
+ $('status').textContent='OFFLINE';$('status').style.color='#ff6767';$('count').textContent='—';
  $('open').textContent='DATA UNAVAILABLE';$('trend').textContent='—';$('fill').style.width='0%';
- $('rate').textContent='—';$('next').textContent='—';$('usual').textContent='—';
+ $('rate').textContent='—';$('next').textContent='—';$('usual').textContent='—';$('points').textContent='—';$('coverage').textContent='Unable to verify dataset';$('usualNote').textContent='—';$('nextNote').textContent='Unavailable';
  $('updated').textContent='—';$('capacity').textContent='—';
- $('insight').textContent='Unable to retrieve occupancy data: '+message;
+ $('insight').textContent='Unable to retrieve occupancy data: '+message+' · The live backend may need deployment. Check the Firebase Cloud Functions deployment and scheduled collector logs.';
  $('dayNote').textContent='Data unavailable.';clearChart('Unable to load readings.');
  $('besttimes').innerHTML='<div class="fine">No current recommendations.</div>';
  $('heatmap').innerHTML='';
@@ -102,8 +102,8 @@ async function refresh(){
  busy=true;$('refresh').disabled=true;
  try{
   const res=await fetch('/api/status?t='+Date.now(),{cache:'no-store',headers:{Accept:'application/json'}});
-  let data;try{data=await res.json();}catch{throw Error('Firebase API returned non-JSON data.');}
-  if(!res.ok||!data||data.ok!==true)throw Error((data&&data.error)||'Data unavailable.');
+  let data;try{data=await res.json();}catch{throw Error('Firebase /api/status did not return JSON (HTTP '+res.status+'). Confirm the getOccupancy function was deployed.');}
+  if(!res.ok||!data||data.ok!==true)throw Error((data&&data.error)||('API HTTP '+res.status));
   render(data);
  }catch(err){errorState(err.message||String(err));}
  finally{busy=false;$('refresh').disabled=false;}
