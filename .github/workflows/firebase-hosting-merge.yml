@@ -42,5 +42,22 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
           chmod 600 "$RUNNER_TEMP/firebase-service-account.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+      - name: Explain required Firebase runtime IAM permission
+        shell: bash
+        run: |
+          DEPLOYER_EMAIL="$(node -p "JSON.parse(require('fs').readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS,'utf8')).client_email")"
+          if [ -z "$DEPLOYER_EMAIL" ] || [ "$DEPLOYER_EMAIL" = "undefined" ]; then
+            echo "::error::Service-account JSON does not contain client_email."
+            exit 1
+          fi
+          echo "GitHub deployer identity: $DEPLOYER_EMAIL"
+          echo "Runtime identity: theknotcapacity@appspot.gserviceaccount.com"
+          echo "For Cloud Functions deployment, the GitHub deployer needs iam.serviceAccounts.actAs on the runtime identity."
+          {
+            echo "### Firebase deploy identity"
+            echo "Deployer: \`$DEPLOYER_EMAIL\`"
+            echo "Runtime account: \`theknotcapacity@appspot.gserviceaccount.com\`"
+            echo "If deployment fails with iam.serviceAccounts.actAs, grant **Service Account User** to the deployer on the runtime account in Google Cloud IAM, then rerun this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Deploy Hosting, Cloud Functions, and Firestore rules
         run: firebase deploy --project theknotcapacity --only functions,hosting,firestore:rules --non-interactive
