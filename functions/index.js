@@ -28,7 +28,8 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
   if(!res.ok)throw Error(`Source HTTP ${res.status}`);
   const body=await res.json();
   if(body.ok!==true||typeof body.currentCapacity!=='number'||!Number.isFinite(body.currentCapacity))throw Error('Invalid source payload');
-  count=Math.max(0,Math.round(body.currentCapacity));
+  if(body.currentCapacity<0)throw Error('Negative source occupancy');
+  count=Math.round(body.currentCapacity); // counts >100 are valid observations; 100 is a policy reference
  }catch(e){logger.error('Source unavailable; retaining prior reading rather than claiming a new live count',e);
   await STATUS.set({error:String(e.message||e),sourceErrorAt:now.toISOString()},{merge:true});return;
  }finally{clearTimeout(timer);}
@@ -65,12 +66,17 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   if(!s.exists){res.status(503).json({ok:false,error:'Waiting for first scheduled reading.'});return;}
   const status=s.data(),weekly=w.exists?w.data():{};
   let response=L.summarize(status,d.exists?d.data():{},weekly);
-  const age=(Date.now()-Date.parse(status.sourceUpdated||status.updated))/60000;
+  const age=(Date.now()-Date.parse(status.sourceUpdated||''))/60000;
   // Display a warning if source readings are old. Never silently claim LIVE.
   response.sourceAgeMinutes=Number.isFinite(age)?Math.round(age):null;
-  response.fresh=(!response.open)||(Number.isFinite(age)&&age<=3&&!status.error);
-  if(response.open&&!response.fresh){response.ok=false;response.error='Source reading delayed; latest stored reading has not been refreshed.';}
-  res.set('Cache-Control','public,max-age=0,s-maxage=20');
+  response.dataState=!response.open?'closed':(Number.isFinite(age)&&age<=3&&!status.error?'live':
+   (Number.isFinite(age)&&age<=30?'delayed':'offline'));
+  response.fresh=response.dataState==='live';
+  response.ok=true; // A delayed response is valid JSON: render its warning, not an API error.
+  if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';}
+  if(response.dataState==='delayed')response.warning='Source reading delayed; last known count only.';
+  if(response.dataState==='offline')response.warning='Source unavailable; last known count is not reliable.';
+  res.set('Cache-Control','no-store');
   res.set('X-Content-Type-Options','nosniff');
   res.json(response);
  }catch(e){logger.error('GET status failed',e);res.status(503).json({ok:false,error:'Service temporarily unavailable'});}
