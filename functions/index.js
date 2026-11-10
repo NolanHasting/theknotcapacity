@@ -8,13 +8,16 @@ const L=require('./logic');
 initializeApp();
 const db=getFirestore();
 const REGION='us-east1';
+// Explicitly use the runtime identity already authorized for GitHub deployments.
+// Gen 2 otherwise defaults to the Compute Engine account, which caused 403 ActAs errors.
+const RUNTIME_SERVICE_ACCOUNT='theknotcapacity@appspot.gserviceaccount.com';
 const ENDPOINT='https://climbtheknot.com/api/capacity.json';
 const STATUS=db.collection('system').doc('current');
 const WEEKLY=db.collection('system').doc('weekly');
 
 // One scheduled check per minute. Closed hours do not contact the gym endpoint.
 exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:REGION,
- memory:'256MiB',timeoutSeconds:45,maxInstances:1},async()=>{
+ memory:'256MiB',timeoutSeconds:45,maxInstances:1,serviceAccount:RUNTIME_SERVICE_ACCOUNT},async()=>{
  const now=new Date(),p=L.parts(now),open=L.openNow(p);
  if(!open){
   await STATUS.set({...L.crowd(null,false),open:false,count:null,trend:'closed',trendLabel:'CLOSED HOURS',
@@ -58,7 +61,7 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
 // The only public API. Firestore itself is not client-readable.
 // Firebase Hosting rewrites /api/status to this function on the same domain.
 exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
- maxInstances:3,invoker:'public'},async(req,res)=>{
+ maxInstances:3,invoker:'public',serviceAccount:RUNTIME_SERVICE_ACCOUNT},async(req,res)=>{
  if(req.method!=='GET'){res.status(405).json({ok:false,error:'GET only'});return;}
  try{
   const p=L.parts(new Date());
