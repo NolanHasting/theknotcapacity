@@ -1,23 +1,46 @@
-
-name: Deploy Firebase Website
+name: Deploy Firebase website and live data backend
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout website files
-        uses: actions/checkout@v4
-
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - uses: actions/checkout@v4
+      - name: Configure Node
+        uses: actions/setup-node@v4
         with:
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_THEKNOTCAPACITY }}'
-          projectId: theknotcapacity
-          channelId: live
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - name: Install and test backend
+        run: |
+          npm ci --prefix functions
+          npm test --prefix functions
+          node --check functions/index.js
+          node --check public/app.js
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+      - name: Configure Firebase credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THEKNOTCAPACITY }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "Missing FIREBASE_SERVICE_ACCOUNT_THEKNOTCAPACITY repository secret"
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+          chmod 600 "$RUNNER_TEMP/firebase-service-account.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+      - name: Deploy Hosting, Cloud Functions, and Firestore rules
+        run: firebase deploy --project theknotcapacity --only functions,hosting,firestore:rules --non-interactive
