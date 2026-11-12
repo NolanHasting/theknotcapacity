@@ -67,5 +67,3 @@ footer{margin-top:27px;border-top:1px solid var(--line);padding-top:18px;display
 .chart-point:focus-visible{stroke:#f0c468;stroke-width:2;fill:rgba(240,196,104,.18);outline:none}
 .heat .cell{cursor:help}
 @media(max-width:500px){.date-shortcuts{margin-top:10px}.history-toolbar{gap:10px}}
-
-.planner-launch{color:#9fd39b;text-decoration:none;font-size:12px;font-weight:750;white-space:nowrap;border:1px solid rgba(159,211,155,.38);padding:8px 10px;border-radius:8px}.planner-launch:hover,.planner-launch:focus-visible{background:rgba(159,211,155,.12)}
