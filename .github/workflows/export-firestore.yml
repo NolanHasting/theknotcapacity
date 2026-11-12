@@ -30,10 +30,25 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firestore-export-sa.json" >> "$GITHUB_ENV"
       - name: Export Firestore data
         run: node functions/export-firestore.js
-      - name: Upload private workflow artifact
+      - name: Encrypt sensitive export before artifact upload
+        env:
+          EXPORT_ENCRYPTION_PASSWORD: ${{ secrets.EXPORT_ENCRYPTION_PASSWORD }}
+        run: |
+          if [ -z "$EXPORT_ENCRYPTION_PASSWORD" ]; then
+            echo "::error::Set EXPORT_ENCRYPTION_PASSWORD in GitHub Actions secrets before exporting."
+            exit 1
+          fi
+          tar -czf "$RUNNER_TEMP/knot-history.tar.gz" -C exports .
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+            -in "$RUNNER_TEMP/knot-history.tar.gz" \
+            -out "$RUNNER_TEMP/knot-history.tar.gz.enc" \
+            -pass env:EXPORT_ENCRYPTION_PASSWORD
+          mkdir -p encrypted-export
+          mv "$RUNNER_TEMP/knot-history.tar.gz.enc" encrypted-export/
+      - name: Upload encrypted workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: knot-firestore-export
-          path: exports/
+          name: knot-firestore-export-encrypted
+          path: encrypted-export/
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 1
