@@ -85,8 +85,8 @@ async function postPlanner(req,res){
   const batch=db.batch();
   for(const doc of [...plans.docs,...push.docs,...requests.docs])batch.delete(doc.ref);
   for(const friendId of (profile.friends||[])){
-   const other=profileRef(friendId);
-   batch.update(other,{friends:FieldValue.arrayRemove(u.uid)});
+   const other=profileRef(friendId),doc=await other.get();
+   if(doc.exists)batch.update(other,{friends:FieldValue.arrayRemove(u.uid)});
    batch.delete(other.collection('requests').doc(u.uid));
   }
   batch.delete(codes.doc(profile.friendCode));
@@ -200,7 +200,7 @@ exports.evaluatePlannerAlerts=onSchedule({schedule:'*/5 * * * *',timeZone:'Ameri
  if(!state.open||state.error||!Number.isFinite(state.count)||!Number.isFinite(age)||age>3)return;
  let last=null,processed=0;
  for(let page=0;page<20;page++){
-  let query=users.where('alerts.enabled','==',true).orderBy('__name__').limit(100);
+  let query=users.where('alerts.enabled','==',true).limit(100);
   if(last)query=query.startAfter(last);
   const batch=await query.get();if(batch.empty)break;
   for(const doc of batch.docs){
@@ -211,17 +211,17 @@ exports.evaluatePlannerAlerts=onSchedule({schedule:'*/5 * * * *',timeZone:'Ameri
      // Keep the prior alert clock while updating the last observed count.
      await doc.ref.update({alertState:decision.next});continue;
     }
-    let accepted=false;
+    let accepted=false,sendDecision=null;
     await db.runTransaction(async tx=>{
      const fresh=await tx.get(doc.ref);
      if(!fresh.exists||!fresh.data().alerts?.enabled)return;
      const check=P.alertDecision(fresh.data().alerts,fresh.data().alertState||{},state.count,now,state.forecast);
      if(!check.type)return;
-     tx.update(doc.ref,{alertState:check.next});accepted=true;
+     tx.update(doc.ref,{alertState:check.next});accepted=true;sendDecision=check;
     });
     if(!accepted)continue;
     const tokens=await doc.ref.collection('pushTokens').limit(10).get();
-    const message=P.alertText(decision.type,state.count,data.alerts.threshold,decision.predicted);
+    const message=P.alertText(sendDecision.type,state.count,data.alerts.threshold,sendDecision.predicted);
     if(!message)continue;
     for(const tokenDoc of tokens.docs){
      try{
