@@ -41,7 +41,7 @@ async function main(){
   exportedAt,projectId:db.app.options.projectId,
   dayDocuments:days.length,readings:rows.length,validReadings:valid.length,invalidReadings:rows.length-valid.length,
   uniqueDates:uniqueDates.size,firstReading:valid[0]?.timestamp || null,lastReading:valid[valid.length-1]?.timestamp || null,
-  minimum:counts.length?Math.min(...counts.slice(0,100000)):null,
+  minimum:counts.length?counts.reduce((m,n)=>Math.min(m,n),Infinity):null,
   maximum:counts.length?counts.reduce((m,n)=>Math.max(m,n),-Infinity):null,
   average:counts.length?Math.round(100*counts.reduce((s,n)=>s+n,0)/counts.length)/100:null,
   aboveCapacityReadings:counts.filter(n=>n>=100).length,
