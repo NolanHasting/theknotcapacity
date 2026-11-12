@@ -2,9 +2,10 @@
 const {onSchedule}=require('firebase-functions/v2/scheduler');
 const {onRequest}=require('firebase-functions/v2/https');
 const {initializeApp}=require('firebase-admin/app');
-const {getFirestore}=require('firebase-admin/firestore');
+const {getFirestore,FieldPath}=require('firebase-admin/firestore');
 const {logger}=require('firebase-functions');
 const L=require('./logic');
+const H=require('./history');
 initializeApp();
 const db=getFirestore();
 const REGION='us-east1';
@@ -86,4 +87,33 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   res.set('X-Content-Type-Options','nosniff');
   res.json(response);
  }catch(e){logger.error('GET status failed',e);res.status(503).set('Cache-Control','no-store').json({ok:false,error:'Backend could not read occupancy from Firestore. Check function logs and Firestore permissions.'});}
+});
+
+// Public read-only, occupancy-only date selection API.
+// Never expose Firestore document metadata, credentials, or unbounded scans.
+exports.getHistory=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
+ maxInstances:3,invoker:'public',serviceAccount:RUNTIME_SERVICE_ACCOUNT},async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ res.set('X-Content-Type-Options','nosniff');
+ if(req.method!=='GET'){res.status(405).json({ok:false,error:'GET only'});return;}
+ const date=req.query.date,today=L.parts(new Date()).day;
+ if(!H.dateOnly(date)){res.status(400).json({ok:false,error:'Use a valid date in YYYY-MM-DD format.'});return;}
+ const days=(Date.parse(date+'T12:00:00Z')-Date.parse(today+'T12:00:00Z'))/86400000;
+ if(days< -120||days>30){res.status(400).json({ok:false,error:'Choose a date within the past 120 days or next 30 days.'});return;}
+ try{
+  let response;
+  if(days<=0){
+   const doc=await db.collection('days').doc(date).get();
+   response=H.historical(doc.exists?doc.data():{points:[]},date);
+  }else{
+   const lower=new Date(Date.parse(date+'T12:00:00Z')-60*86400000).toISOString().slice(0,10);
+   const snap=await db.collection('days').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
+   const records=snap.docs.map(d=>({...d.data(),date:d.id}));
+   response=H.future(date,records);
+  }
+  res.json({ok:true,...response});
+ }catch(err){
+  logger.error('getHistory failed',err);
+  res.status(503).json({ok:false,error:'Unable to read historical observations right now.'});
+ }
 });

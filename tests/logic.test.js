@@ -20,11 +20,15 @@ assert.ok(fallback&&fallback.points.length>20&&fallback.confidence==='EARLY');
 assert.equal(fallback.points[fallback.points.length-1].minutes,750);
 const f=L.forecast(49,5,weekly,date);
 assert.ok(f&&f.points.length>2);
-for(const p of f.points){assert.ok(p.low>=0&&p.low<=p.count&&p.count<=p.high&&p.high<=100);}
+assert.equal(f.points.at(-1).count,0);
+assert.equal(f.points.at(-1).high,0);
+assert.equal(L.forecast(142,0,{},date).points[0].count,142);
+for(const p of f.points){assert.ok(p.low>=0&&p.low<=p.count&&p.count<=p.high&&p.high>=p.count);}
 for(const c of [0,100,105,149]){
  for(const rate of [-30,0,30]){
   const test=L.forecast(c,rate,{},date);
-  assert.ok(test.points.every(x=>x.count<=100&&x.high<=100&&x.low>=0));
+  assert.ok(test.points.every(x=>x.count>=0&&x.high>=x.count&&x.low>=0));
+  assert.equal(test.points.at(-1).count,0);
  }
 }
 // Same-hour mean must weight days equally, not the day that supplied more samples.
@@ -41,4 +45,30 @@ assert.ok(b.every(x=>x.hour>=11));
 assert.equal(L.slope([],date,48),null);
 const observed=[{timestamp:'2026-11-10T15:00:00Z',count:20},{timestamp:'2026-11-10T15:10:00Z',count:24},{timestamp:'2026-11-10T15:20:00Z',count:28}];
 assert.ok(L.slope(observed,date,32)>0);
+// An abrupt manual reset must not manufacture an extreme downward trend.
+const corrected=[
+ {timestamp:'2026-11-10T14:00:00Z',count:120},
+ {timestamp:'2026-11-10T14:05:00Z',count:124},
+ {timestamp:'2026-11-10T14:06:00Z',count:60},
+ {timestamp:'2026-11-10T14:15:00Z',count:63},
+ {timestamp:'2026-11-10T14:20:00Z',count:65},
+];
+const correctedRate=L.slope(corrected,new Date('2026-11-10T14:30:00Z'),67);
+assert.ok(correctedRate>0);
+const H=require('../functions/history');
+assert.equal(H.dateOnly('2026-11-10'),true);
+assert.equal(H.dateOnly('2026-02-30'),false);
+assert.equal(H.dateOnly('../system/current'),false);
+const historyRecords=[
+ {date:'2026-11-10',points:Array.from({length:15},(_,i)=>({timestamp:new Date(Date.parse('2026-11-10T15:00:00Z')+i*60000).toISOString(),count:80}))},
+ {date:'2026-11-11',points:Array.from({length:15},(_,i)=>({timestamp:new Date(Date.parse('2026-11-11T15:00:00Z')+i*60000).toISOString(),count:60}))},
+];
+const observedDay=H.historical(historyRecords[0],'2026-11-10');
+assert.equal(observedDay.points.length,15);
+const future=H.future('2026-11-17',historyRecords);
+assert.equal(future.mode,'future');
+assert.equal(future.points.at(-1).count,0);
+assert.equal(future.points.find(p=>p.minute===600).count,70); // General recent-days fallback
+assert.equal(future.summary.referenceDays,2);
+assert.equal(H.future('2026-11-17',[]).points.length,0);
 console.log('All backend logic tests passed.');

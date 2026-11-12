@@ -42,7 +42,7 @@ function dayChart(d){
  }
  $('dayChart').innerHTML=marks+shapes+ticks.join('');
  $('forecastType').textContent=forecast?forecast.confidence+' ESTIMATE':'OBSERVED ONLY';
- $('dayNote').textContent=history.length+' readings today'+(forecast?' · predicted at closing: '+forecast.closing+' · forecast is exploratory with an illustrative, uncalibrated spread.':' · forecast unavailable until live data is restored.');
+ $('dayNote').textContent=history.length+' readings today'+(forecast?' · assumed empty at configured closing time · forecast is exploratory with an illustrative, uncalibrated spread.':' · forecast unavailable until live data is restored.');
 }
 const HEAT_COLORS=[
  '#123f32','#196047','#257b4d','#40945b',
@@ -93,7 +93,7 @@ function render(d){
  $('next').textContent=live&&d.forecast?d.forecast.projected:'—';
  $('nextNote').textContent=live&&d.forecast?'exploratory · '+Math.min(60,d.forecast.horizonMinutes)+' min ahead':'not available';
  $('points').textContent=d.dataPoints||0;$('coverage').textContent=d.note||'historical readings';
- $('insight').textContent=(d.warning?d.warning+' ':'')+(d.insight||'')+(live&&d.forecast?' Projection combines smoothed movement with historical day-level averages and is not a guarantee.':'');
+ $('insight').textContent=(d.warning?d.warning+' ':'')+(d.insight||'')+(live&&d.forecast?' Projections use short-term movement and developing weekday averages; abrupt source corrections may occur. Closing-time zero is an assumption, not a measured count.':'');
  $('logged').textContent='Last logged reading: '+time(d.lastLogged);
  dayChart(d);renderHeat(d.heatmap);renderBest(d.bestTimes);
 }
