@@ -70,9 +70,16 @@
     }
    }
   }
+  if(!isFuture){
+   for(let i=0;i<source.length;i+=Math.max(1,Math.ceil(source.length/130))){
+    const p=source[i];
+    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="5" fill="transparent" stroke="none" tabindex="0" role="button" data-info="'+safe(tick(p.minute)+': '+p.count+' reported')+'"/>';
+   }
+  }
   if(isFuture){
    for(const p of observed){
-    html+='<circle cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="2.5" fill="#f0c468"><title>'+safe(tick(p.minute))+': '+p.count+' estimate · '+p.days+' past day(s)'+(p.assumedClose?' · closing assumption':'')+'</title></circle>';
+    const info=tick(p.minute)+': '+p.count+(p.assumedClose?' assumed at close':' predicted')+' · '+p.days+' supporting day(s)';
+    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="4.2" fill="#f0c468" tabindex="0" role="button" data-info="'+safe(info)+'"><title>'+safe(info)+'</title></circle>';
    }
   }
   svg.innerHTML=html;
@@ -104,6 +111,14 @@
  };
  input.min=addDays(-120);input.max=addDays(30);input.value=iso;
  input.addEventListener('change',load);
+ el('historyToday').onclick=()=>{input.value=localDay(new Date());load();};
+ el('historyTomorrow').onclick=()=>{input.value=addFrom(localDay(new Date()),1);load();};
+ function showPoint(e){
+  const point=e.target.closest?.('[data-info]');
+  if(point)el('historySelection').textContent=point.getAttribute('data-info');
+ }
+ svg.addEventListener('click',showPoint);
+ svg.addEventListener('focusin',showPoint);
  el('historyPrevious').onclick=()=>{if(input.value>input.min){input.value=addFrom(input.value,-1);load();}};
  el('historyNext').onclick=()=>{if(input.value<input.max){input.value=addFrom(input.value,1);load();}};
  function addFrom(value,n){const d=new Date(value+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
