@@ -65,10 +65,12 @@ function reportedChange30(points,now=new Date()){
 
 function trend(rate,open){
  if(!open)return {key:'closed',label:'CLOSED HOURS'};
- if(rate==null)return {key:'learning',label:'LEARNING'};
- if(rate>=4)return {key:'rising',label:'FILLING UP'};
- if(rate<=-4)return {key:'falling',label:'DECREASING'};
- return {key:'steady',label:'STEADY'};
+ // A neutral three-state fallback keeps mobile widgets stable while
+ // history is sparse or immediately after a possible staff recount.
+ if(rate==null)return {key:'steady',label:'STEADY',arrow:'→'};
+ if(rate>=4)return {key:'rising',label:'FILLING UP',arrow:'↑'};
+ if(rate<=-4)return {key:'falling',label:'DECREASING',arrow:'↓'};
+ return {key:'steady',label:'STEADY',arrow:'→'};
 }
 function typical(weekly,p){
  const a=weekly[`${p.dow}-${p.hour}`];
