@@ -50,3 +50,12 @@ footer{margin-top:27px;border-top:1px solid var(--line);padding-top:18px;display
 .history-chart{min-width:700px;max-width:1000px;aspect-ratio:760/285}
 #historyNote{margin-top:10px;line-height:1.5}
 @media(max-width:500px){.history-toolbar{align-items:flex-start}.history-control{gap:5px}.history-control input{padding:8px 5px}}
+
+.insight{margin:12px 0 15px;line-height:1.55;color:#ddd}
+.insight-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:13px 0 18px}
+.insight-item{padding:13px;border:1px solid var(--soft-line);border-radius:9px;background:var(--raised);min-width:0}
+.insight-item strong{display:block;margin:8px 0 4px;font-size:clamp(16px,2.2vw,24px);line-height:1.15;font-variant-numeric:tabular-nums}
+.insight-item small{display:block;color:var(--muted);font-size:11px}
+@media(max-width:670px){.insight-grid{grid-template-columns:1fr}.insight-item{padding:12px}}
+
+.legend i.recount{width:10px;height:10px;border-radius:50%;background:#7dc7e6}

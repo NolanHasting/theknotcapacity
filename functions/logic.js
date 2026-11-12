@@ -87,20 +87,41 @@ function heatmap(weekly){
  }
  return cells;
 }
-function best(weekly,now=new Date()){
+function best(weekly,now=new Date(),liveForecast=null,forecastTimestamp=null){
  const date=now instanceof Date?now:new Date(now),p=parts(date),minNow=p.hour*60+p.minute;
  const options=[];
+ // Prefer today's live forecast over historical hourly averages when available.
+ // Ignore the closing hour: the forced closing taper is not a useful climbing slot.
+ if(liveForecast&&Array.isArray(liveForecast.points)&&Number.isFinite(Date.parse(forecastTimestamp))){
+  const hourGroups=new Map(),closing=HOURS[p.dow][1];
+  for(const point of liveForecast.points){
+   if(!Number.isFinite(point.count)||!Number.isFinite(point.minutes)||point.minutes===0)continue;
+   const at=parts(new Date(Date.parse(forecastTimestamp)+point.minutes*60000));
+   if(at.day!==p.day||at.hour<Math.ceil(minNow/60)||at.hour>=closing-1)continue;
+   const group=hourGroups.get(at.hour)||[];
+   group.push(point.count);hourGroups.set(at.hour,group);
+  }
+  for(const [hour,values] of hourGroups){
+   if(values.length<2)continue;
+   const historical=typical(weekly,{dow:p.dow,hour});
+   options.push({day:DAYS[p.dow],dayIndex:p.dow,hour,
+    average:Math.round(values.reduce((a,b)=>a+b,0)/values.length),
+    historicalAverage:historical.average,samples:values.length,days:historical.days,
+    source:'forecast',provisional:true,reliability:'EARLY'});
+  }
+  if(options.length)return options.sort((a,b)=>a.average-b.average||a.hour-b.hour).slice(0,4);
+ }
  // Only suggest future hours TODAY (not closed hours, not past slots).
  for(let h=Math.max(HOURS[p.dow][0],Math.ceil(minNow/60));h<HOURS[p.dow][1];h++){
   const t=typical(weekly,{dow:p.dow,hour:h});
   // Avoid declaring an hour 'quiet' based on only a handful of minutes.
   if(t.average===null||t.samples<10)continue;
   options.push({day:DAYS[p.dow],dayIndex:p.dow,hour:h,average:t.average,samples:t.samples,days:t.days,
-   reliability:t.days>=3?'DEVELOPING':'LIMITED',provisional:t.days<3});
+   source:'history',reliability:t.days>=3?'DEVELOPING':'LIMITED',provisional:t.days<3});
  }
  return options.sort((a,b)=>a.average-b.average||a.hour-b.hour).slice(0,4);
 }
-function forecast(count,rate,weekly,now){
+function forecast(count,rate,weekly,now,correction=null){
  const p=parts(now),minutes=remainingMinutes(p);
  if(minutes<=0||!Number.isFinite(count))return null;
  const start=typical(weekly,p),hasBaseline=start.average!==null&&start.days>=2;
@@ -108,7 +129,7 @@ function forecast(count,rate,weekly,now){
  const steps=[0];for(let m=15;m<minutes;m+=15)steps.push(m);
  if(steps[steps.length-1]!==minutes)steps.push(minutes);
  // Source values above the policy reference of 100 are valid; do not truncate them.
- const safeStart=Math.max(0,count);
+ const safeStart=Math.max(0,Number.isFinite(correction?.estimatedNow)?correction.estimatedNow:count);
  for(const m of steps){
   const at=parts(new Date(now.getTime()+m*60000)),target=typical(weekly,at);
   // Trend impact saturates instead of being extrapolated linearly to closing.
@@ -126,16 +147,19 @@ function forecast(count,rate,weekly,now){
   // taper toward closing; the first point always stays equal to the observation.
   const tillClose=minutes-m;
   const closure=m===0?1:clamp(tillClose/Math.min(minutes,75),0,1);
-  const estimate=Math.max(0,Math.round((safeStart+(1-evidence)*drift+evidence*historicalDelta*influence)*closure));
+  // The live projection is anchored to estimated current occupancy, never a fabricated exact headcount.
+  const departureRate=Number.isFinite(correction?.departureRate)?correction.departureRate:0;
+  const departures=departureRate>0?Math.min(m,60)*departureRate*0.45:0;
+  const estimate=Math.max(0,Math.round((safeStart+(1-evidence)*drift+evidence*historicalDelta*influence-departures)*closure));
   // These are illustrative scenarios, not calibrated confidence intervals.
   const spread=m===0||m===minutes?0:Math.min(35,8+5*Math.sqrt(m/60)+(hasBaseline?3:8))*closure;
   predicted.push({minutes:m,count:estimate,low:Math.max(0,Math.round(estimate-spread)),high:Math.max(estimate,Math.round(estimate+spread))});
  }
  const hour=predicted.find(r=>r.minutes===60)||predicted.find(r=>r.minutes>=60)||predicted[predicted.length-1];
- return {current:count,projected:hour.count,change:hour.count-count,closing:predicted[predicted.length-1].count,
+ return {current:count,estimatedStart:safeStart,projected:hour.count,change:hour.count-safeStart,closing:predicted[predicted.length-1].count,
   points:predicted,horizonMinutes:minutes,confidence:hasBaseline?'DEVELOPING':'EARLY',matchingDays:start.days,
-  method:hasBaseline?'Smoothed recent movement + growing weekday history':'Smoothed recent movement / persistence',
-  disclaimer:'Exploratory forecast; shaded range is illustrative, not a calibrated confidence interval. Rapid negative source corrections are excluded from movement estimates. A zero reading at closing is a modeled assumption, not a measured count.'};
+  method:Number.isFinite(correction?.estimatedNow)?'Recount-based estimate + recent movement':'Recent movement + limited history',
+  disclaimer:'Forecasts are estimates. Sudden drops may be staff recounts. The closing-time zero is a schedule assumption, not an observed reading.'};
 }
 function summarize(status,day,week,now=new Date()){
  const recent=(day&&day.points)||[],p=parts(now);

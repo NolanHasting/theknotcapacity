@@ -17,10 +17,10 @@
  function graph(data){
   const isFuture=data.mode==='future',source=isFuture?data.points:data.points.map(p=>({...p,minute:localMinute(p.timestamp)}));
   svg.innerHTML='';
-  if(!source.length){svg.innerHTML='<text x="40" y="155" fill="#aaa">No observations available for this date.</text>';return;}
+  if(!source.length){svg.innerHTML='<text x="40" y="155" fill="#aaa">No data for this date.</text>';return;}
   const futureHours=[7,23],minX=7*60,maxX=23*60;
   const observed=source.filter(p=>Number.isFinite(p.count));
-  const peak=Math.max(100,...observed.map(p=>p.count)),ceiling=Math.ceil(peak/25)*25;
+  const peak=Math.max(100,...observed.map(p=>Math.max(p.count,p.high||0))),ceiling=Math.ceil(peak/25)*25;
   const left=45,right=743,top=20,bottom=246;
   const x=m=>left+(m-minX)/(maxX-minX)*(right-left);
   const y=v=>bottom-v/ceiling*(bottom-top);
@@ -40,18 +40,46 @@
    path+=(contiguous?'L':'M')+curX.toFixed(1)+' '+curY.toFixed(1)+' ';
    prev=p;
   }
+  if(isFuture){
+   // Draw separate ribbons; missing data must remain empty instead of being interpolated.
+   const runs=[];let run=[];
+   for(const p of source){
+    if(!Number.isFinite(p.count)||!Number.isFinite(p.low)||!Number.isFinite(p.high)){
+     if(run.length>1)runs.push(run);run=[];continue;
+    }
+    if(run.length&&p.minute-run[run.length-1].minute>16){
+     if(run.length>1)runs.push(run);run=[];
+    }
+    run.push(p);
+   }
+   if(run.length>1)runs.push(run);
+   for(const points of runs){
+    const upper=points.map((p,i)=>(i?'L':'M')+x(p.minute).toFixed(1)+' '+y(p.high).toFixed(1)).join(' ');
+    const lower=points.slice().reverse().map(p=>'L'+x(p.minute).toFixed(1)+' '+y(p.low).toFixed(1)).join(' ');
+    html+='<path d="'+upper+' '+lower+' Z" fill="#f0c468" opacity=".12"/>';
+   }
+  }
   html+='<line x1="'+left+'" x2="'+right+'" y1="'+y(100)+'" y2="'+y(100)+'" stroke="#cc7676" stroke-dasharray="5 5" opacity=".8"/>';
   html+='<path d="'+path+'" stroke="'+(isFuture?'#f0c468':'#fff')+'" stroke-width="2.4" fill="none" stroke-linejoin="round" stroke-linecap="round"'+(isFuture?' stroke-dasharray="6 4"':'')+'/>';
+  if(!isFuture){
+   for(let i=1;i<source.length;i++){
+    const a=source[i-1],b=source[i];
+    const elapsed=(Date.parse(b.timestamp)-Date.parse(a.timestamp))/60000;
+    if(elapsed>0&&elapsed<=3&&a.count-b.count>=15){
+     html+='<circle cx="'+x(b.minute)+'" cy="'+y(b.count)+'" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Possible staff recount</title></circle>';
+    }
+   }
+  }
   if(isFuture){
    for(const p of observed){
-    html+='<circle cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="2.5" fill="#f0c468"><title>'+safe(tick(p.minute))+': '+p.count+' predicted · '+p.days+' source day(s)'+(p.assumedClose?' · closing assumption':'')+'</title></circle>';
+    html+='<circle cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="2.5" fill="#f0c468"><title>'+safe(tick(p.minute))+': '+p.count+' estimate · '+p.days+' past day(s)'+(p.assumedClose?' · closing assumption':'')+'</title></circle>';
    }
   }
   svg.innerHTML=html;
  }
  async function load(){
   const date=input.value;if(!date)return;
-  summary.textContent='Loading occupancy data…';note.textContent='';legend.textContent='';
+  summary.textContent='Loading…';note.textContent='';legend.textContent='';
   svg.innerHTML='<text x="40" y="155" fill="#aaa">Loading…</text>';
   input.disabled=true;
   try{
@@ -60,15 +88,15 @@
    if(!res.ok||!d.ok)throw Error(d.error||'Unable to load date');
    const label=dayFmt.format(new Date(date+'T12:00:00Z'));
    if(d.mode==='historical'){
-    summary.textContent=label+' · '+d.summary.readings+' readings'+(d.summary.readings?' · average '+d.summary.average+' · peak '+d.summary.max:'');
-    legend.textContent='OBSERVED DATA';
+    summary.textContent=label+(d.summary.readings?' · avg. '+d.summary.average+' · peak '+d.summary.max:' · No counts recorded');
+    legend.textContent='REPORTED';
    }else{
-    summary.textContent=label+' · '+d.summary.referenceDays+' reference days · '+d.summary.coveredSlots+' of '+d.summary.totalSlots+' quarter-hour slots with supporting data';
-    legend.textContent='EARLY ESTIMATE · '+d.basis.toUpperCase();
+    summary.textContent=label+' · Based on '+d.summary.referenceDays+' past day'+(d.summary.referenceDays===1?'':'s');
+    legend.textContent='ESTIMATE · '+d.basis.toUpperCase();
    }
    note.textContent=d.note;
    graph(d);
-  }catch(e){summary.textContent='Unable to load occupancy date';note.textContent=e.message;svg.innerHTML='';}
+  }catch(e){summary.textContent='Could not load this date';note.textContent=e.message;svg.innerHTML='';}
   finally{input.disabled=false;}
  }
  const today=new Date(),iso=localDay(today),addDays=n=>{

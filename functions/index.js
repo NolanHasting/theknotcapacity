@@ -6,6 +6,7 @@ const {getFirestore,FieldPath}=require('firebase-admin/firestore');
 const {logger}=require('firebase-functions');
 const L=require('./logic');
 const H=require('./history');
+const R=require('./recounts');
 initializeApp();
 const db=getFirestore();
 const REGION='us-east1';
@@ -47,12 +48,17 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
   const weekly=weeklySnap.exists?weeklySnap.data():{total:0,started:now.toISOString()};
   const oldRecent=(old.recent||[]).filter(x=>now-Date.parse(x.timestamp)<50*60000);
   const rate=L.slope(oldRecent,now,count),direction=L.trend(rate,true);
+  const priorPoint=oldRecent.length?oldRecent[oldRecent.length-1]:null;
+  const correction=R.update(old.recountModel||{},priorPoint,count,now);
   const nextWeekly=L.addWeekly(weekly,p,count);
-  const projection=L.forecast(count,rate,nextWeekly,now);
+  const projection=L.forecast(count,rate,nextWeekly,now,correction);
   const sample={timestamp:now.toISOString(),count};
   const status={...L.crowd(count,true),open:true,count,trend:direction.key,trendLabel:direction.label,
    trendPer30:rate,forecast:projection,updated:now.toISOString(),sourceUpdated:now.toISOString(),
-   lastLogged:now.toISOString(),lastMinuteId:minuteId,recent:[...oldRecent,sample].slice(-50),error:null};
+   lastLogged:now.toISOString(),lastMinuteId:minuteId,recent:[...oldRecent,sample].slice(-50),
+   recountModel:correction.state,estimatedNow:correction.estimatedNow,
+   estimateBasis:correction.estimateBasis,estimateAgeMinutes:correction.estimateAgeMinutes,
+   isPossibleRecount:correction.isReset,error:null};
   tx.set(dayRef,{date:p.day,points:[...(day.points||[]),sample],updated:now.toISOString()});
   tx.set(WEEKLY,{...nextWeekly,total:(weekly.total||0)+1});
   tx.set(STATUS,status);
@@ -79,6 +85,7 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   response.lastSourceErrorAt=status.sourceErrorAt||null;
   response.sourceHealth=status.error?'fetch_failed':'ok';
   response.ok=true; // A delayed response is valid JSON: render its warning, not an API error.
+  response.bestTimes=L.best(weekly,new Date(),response.dataState==='live'?status.forecast:null,status.sourceUpdated);
   if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';}
   if(response.dataState==='delayed')response.warning='Source reading delayed; last known count only.';
   if(response.dataState==='offline')response.warning='Source unavailable; last known count is not reliable.';

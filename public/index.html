@@ -1,35 +1,35 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#000000">
-<meta name="description" content="Independent climbing gym occupancy dashboard: current crowds, daily trends and exploratory next-hour estimates.">
+<meta name="description" content="Current counts, past activity and expected crowd levels at The Knot.">
 <title>THE KNOT CAPACITY</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
 <link rel="apple-touch-icon" href="/logo.png">
 <link rel="stylesheet" href="/styles.css"></head><body><main>
 <header><div class="brand"><img src="/logo.png" alt="The Knot climbing gym logo">
-<div><div class="brand-name">THE KNOT</div><div class="brand-sub">OCCUPANCY DASHBOARD</div></div></div>
+<div><div class="brand-name">THE KNOT</div><div class="brand-sub">CAPACITY</div></div></div>
 <div class="headright"><div class="connection" role="status" aria-live="polite"><i id="liveDot" class="dot"></i><span id="connection">CONNECTING</span></div><button class="refresh" id="refresh">Refresh ↻</button></div></header>
 <section class="hero"><article class="panel">
-<div class="count-top"><div class="eyebrow">CURRENT OCCUPANCY</div><div class="eyebrow" id="open">—</div></div>
+<div class="count-top"><div class="eyebrow">REPORTED NOW</div><div class="eyebrow" id="open">—</div></div>
 <div class="big" id="count">—</div><div class="summary"><div class="status" id="status">Loading…</div><div class="trend" id="trend">—</div></div>
 <div class="track"><i id="fill" class="fill"></i></div><div class="capacityfoot"><span id="capacity">—</span><span id="updated">—</span></div></article>
-<article class="panel"><div class="eyebrow" style="margin-bottom:14px">AT A GLANCE</div><div class="tiles">
-<div class="tile"><div class="eyebrow">MOVEMENT</div><strong id="rate">—</strong><small>people per 30 min</small></div>
-<div class="tile"><div class="eyebrow">TYPICAL NOW</div><strong id="usual">—</strong><small id="usualNote">same weekday/hour</small></div>
-<div class="tile"><div class="eyebrow">IN 60 MIN</div><strong id="next">—</strong><small id="nextNote">exploratory forecast</small></div>
-<div class="tile"><div class="eyebrow">READINGS</div><strong id="points">—</strong><small id="coverage">historical dataset</small></div>
+<article class="panel"><div class="eyebrow" style="margin-bottom:14px">CROWD OUTLOOK</div><div class="tiles">
+<div class="tile"><div class="eyebrow">ESTIMATED NOW</div><strong id="estimatedNow">—</strong><small id="estimateNote">Not enough recounts</small></div>
+<div class="tile"><div class="eyebrow">PAST AVERAGE</div><strong id="usual">—</strong><small id="usualNote">Past days at this hour</small></div>
+<div class="tile"><div class="eyebrow">IN AN HOUR</div><strong id="next">—</strong><small id="nextNote">Estimated crowd</small></div>
+<div class="tile"><div class="eyebrow">QUIETER LATER</div><strong id="bestQuick">—</strong><small id="bestQuickNote">Not enough history yet</small></div>
 </div></article></section>
-<div class="section-title"><h2>Occupancy analytics</h2><p>Observed movement and what might happen next.</p></div>
+<div class="section-title"><h2>Today</h2></div>
 <section class="charts combined">
-<article class="panel"><div class="charthead"><h3>Today &amp; through closing</h3><span id="forecastType">OBSERVED + EXPLORATORY FORECAST</span></div>
-<div class="chart-scroll" role="region" aria-label="Scrollable occupancy timeline"><svg class="chart" id="dayChart" viewBox="0 0 600 250" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Today's occupancy history and forecast to closing with illustrative uncertainty band"></svg></div>
+<article class="panel"><div class="charthead"><h3>Crowd level through closing</h3><span id="forecastType">REPORTED + FORECAST</span></div>
+<div class="chart-scroll" role="region" aria-label="Scrollable occupancy timeline"><svg class="chart" id="dayChart" viewBox="0 0 600 250" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Today's source readings and expected occupancy through closing"></svg></div>
 <div class="chartnote" id="dayNote">Waiting for readings.</div>
-<div class="legend"><span><i></i>Observed count</span><span><i class="forecast"></i>Forecast to closing</span><span><i class="band"></i>Illustrative spread, not confidence interval</span></div></article>
+<div class="legend"><span><i></i>Reported</span><span><i class="forecast"></i>Forecast</span><span><i class="band"></i>Possible range</span><span><i class="recount"></i>Possible recount / estimate</span></div></article>
 </section>
-<div class="section-title"><h2>Explore occupancy by date</h2><p>Choose a past date for actual readings or a future date for an early, history-based estimate.</p></div>
+<div class="section-title"><h2>By date</h2><p>Past counts and upcoming crowd estimates.</p></div>
 <section class="panel history-panel">
  <div class="history-toolbar">
-  <div><div class="eyebrow">DATE EXPLORER</div><div class="history-control">
+  <div><div class="eyebrow">SELECT A DAY</div><div class="history-control">
    <button class="refresh" id="historyPrevious" aria-label="Previous day">←</button>
    <input id="historyDate" type="date" aria-label="Choose occupancy date">
    <button class="refresh" id="historyNext" aria-label="Next day">→</button>
@@ -40,11 +40,11 @@
  <div class="chart-scroll" role="region" aria-label="Scroll to view selected occupancy history">
   <svg id="historyChart" class="chart history-chart" viewBox="0 0 760 285" role="img" aria-label="Selected day's observed or projected occupancy by time of day"></svg>
  </div>
- <p id="historyNote" class="fine">The source may count member entries before staff manually reconcile occupancy. Future profiles are exploratory and assume zero occupancy at closing.</p>
+ <p id="historyNote" class="fine">Past dates show reported counts. Future dates show estimates.</p>
 </section>
 <div class="tabs"><button class="tab active" data-tab="insights">Insights</button><button class="tab" data-tab="patterns">Weekly patterns</button><button class="tab" data-tab="best">Best times</button></div>
-<section class="view active" id="insights"><article class="panel"><div class="eyebrow">WHAT THE NUMBERS MEAN</div><p class="insight" id="insight">Analyzing today's readings.</p><div class="fine" id="logged">Last logged reading —</div></article></section>
-<section class="view" id="patterns"><article class="panel"><div class="charthead"><h3>Average occupancy by weekday and hour</h3><span>HISTORICAL</span></div><p class="fine">Historical averages by weekday and hour. Hover over a cell for the number of days and readings; patterns with limited coverage are preliminary.</p><div class="heat" id="heatmap"></div><div class="heat-scale" aria-label="Occupancy color scale from zero to 100 plus people"><span>0 · QUIETER</span><div class="heat-gradient"></div><span>100+ · BUSIER</span></div><p class="fine">Dark gray indicates no recorded history. Colors use twelve occupancy levels instead of four.</p></article></section>
-<section class="view" id="best"><article class="panel"><div class="charthead"><h3>Upcoming quieter hours today</h3><span>HISTORICAL · PROVISIONAL</span></div><div class="best" id="besttimes"></div></article></section>
-<footer><span>NOLAN HASTING</span><span>Count Updated Every Minute · Independent Project</span></footer>
+<section class="view active" id="insights"><article class="panel"><div class="eyebrow">CURRENT CONDITIONS</div><p class="insight" id="insight">Checking the current crowd.</p><div class="insight-grid" id="insightDetails"></div><p class="fine" id="logged">Last updated —</p></article></section>
+<section class="view" id="patterns"><article class="panel"><div class="charthead"><h3>Average crowd by day and hour</h3><span>HISTORICAL</span></div><p class="fine">Averages from past days. Hover over a square for details.</p><div class="heat" id="heatmap"></div><div class="heat-scale" aria-label="Occupancy color scale from zero to 100 plus people"><span>0 · QUIETER</span><div class="heat-gradient"></div><span>100+ · BUSIER</span></div><p class="fine">Gray means no data.</p></article></section>
+<section class="view" id="best"><article class="panel"><div class="charthead"><h3>Quieter hours later today</h3><span>PAST COUNTS</span></div><div class="best" id="besttimes"></div></article></section>
+<footer><span>NOLAN HASTING</span><span>Independent site · Not affiliated with The Knot</span></footer>
 </main><script defer src="/app.js"></script><script defer src="/history.js"></script></body></html>
