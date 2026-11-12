@@ -27,6 +27,13 @@ function slope(points,now,count){
  const rows=[...(points||[]),{timestamp:now.toISOString(),count}].filter(r=>Number.isFinite(r.count)&&Number.isFinite(Date.parse(r.timestamp)))
   .map(r=>({x:(Date.parse(r.timestamp)-latest)/60000,y:r.count}))
   .filter(r=>r.x>=-45&&r.x<=0).sort((a,b)=>a.x-b.x);
+ // Large rapid drops are likely a staff reconciliation, not a reliable departure rate.
+ // Estimate movement only from the latest post-reconciliation segment.
+ let reset=0;
+ for(let i=1;i<rows.length;i++){
+  if(rows[i].x-rows[i-1].x<=3 && rows[i-1].y-rows[i].y>=15)reset=i;
+ }
+ if(reset)rows.splice(0,reset);
  if(rows.length<3||rows[rows.length-1].x-rows[0].x<10)return null;
  const weights=rows.map(r=>Math.exp(r.x/25));
  const total=weights.reduce((a,b)=>a+b,0);
@@ -100,7 +107,8 @@ function forecast(count,rate,weekly,now){
  const predicted=[];
  const steps=[0];for(let m=15;m<minutes;m+=15)steps.push(m);
  if(steps[steps.length-1]!==minutes)steps.push(minutes);
- const safeStart=clamp(count,0,MAX);
+ // Source values above the policy reference of 100 are valid; do not truncate them.
+ const safeStart=Math.max(0,count);
  for(const m of steps){
   const at=parts(new Date(now.getTime()+m*60000)),target=typical(weekly,at);
   // Trend impact saturates instead of being extrapolated linearly to closing.
@@ -110,16 +118,20 @@ function forecast(count,rate,weekly,now){
   const historicalDelta=hasBaseline&&target.days>=2&&target.average!==null?target.average-start.average:0;
   const evidence=hasBaseline&&target.days>=2?Math.min(0.65,0.18+0.12*Math.min(start.days,target.days)):0;
   const influence=1-Math.exp(-m/90);
-  const estimate=clamp(Math.round(safeStart+(1-evidence)*drift+evidence*historicalDelta*influence),0,MAX);
-  // These are scenario spreads, not calibrated confidence intervals.
-  const spread=m===0?0:Math.min(35,8+5*Math.sqrt(m/60)+(hasBaseline?3:8));
-  predicted.push({minutes:m,count:estimate,low:clamp(Math.round(estimate-spread),0,MAX),high:clamp(Math.round(estimate+spread),0,MAX)});
+  // Force the projected occupancy to zero only at close. The last 75 minutes
+  // taper toward closing; the first point always stays equal to the observation.
+  const tillClose=minutes-m;
+  const closure=m===0?1:clamp(tillClose/Math.min(minutes,75),0,1);
+  const estimate=Math.max(0,Math.round((safeStart+(1-evidence)*drift+evidence*historicalDelta*influence)*closure));
+  // These are illustrative scenarios, not calibrated confidence intervals.
+  const spread=m===0||m===minutes?0:Math.min(35,8+5*Math.sqrt(m/60)+(hasBaseline?3:8))*closure;
+  predicted.push({minutes:m,count:estimate,low:Math.max(0,Math.round(estimate-spread)),high:Math.max(estimate,Math.round(estimate+spread))});
  }
  const hour=predicted.find(r=>r.minutes===60)||predicted.find(r=>r.minutes>=60)||predicted[predicted.length-1];
  return {current:count,projected:hour.count,change:hour.count-count,closing:predicted[predicted.length-1].count,
   points:predicted,horizonMinutes:minutes,confidence:hasBaseline?'DEVELOPING':'EARLY',matchingDays:start.days,
   method:hasBaseline?'Smoothed recent movement + growing weekday history':'Smoothed recent movement / persistence',
-  disclaimer:'Exploratory forecast; shaded range is an illustrative scenario spread, not a calibrated confidence interval. Predictions are capped at the venue policy limit of 100; observed counts may be higher.'};
+  disclaimer:'Exploratory forecast; shaded range is illustrative, not a calibrated confidence interval. Rapid negative source corrections are excluded from movement estimates. A zero reading at closing is a modeled assumption, not a measured count.'};
 }
 function summarize(status,day,week,now=new Date()){
  const recent=(day&&day.points)||[],p=parts(now);
