@@ -7,6 +7,7 @@ const {logger}=require('firebase-functions');
 const L=require('./logic');
 const H=require('./history');
 const R=require('./recounts');
+const A=require('./analytics');
 initializeApp();
 const db=getFirestore();
 const REGION='us-east1';
@@ -58,8 +59,17 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
    lastLogged:now.toISOString(),lastMinuteId:minuteId,recent:[...oldRecent,sample].slice(-50),
    recountModel:correction.state,estimatedNow:correction.estimatedNow,
    estimateBasis:correction.estimateBasis,estimateAgeMinutes:correction.estimateAgeMinutes,
-   isPossibleRecount:correction.isReset,error:null};
-  tx.set(dayRef,{date:p.day,points:[...(day.points||[]),sample],updated:now.toISOString()});
+   isPossibleRecount:correction.isReset,lastRecountCandidateAt:correction.event?now.toISOString():old.lastRecountCandidateAt||null,error:null};
+  const updatedPoints=[...(day.points||[]),sample];
+  tx.set(dayRef,{date:p.day,points:updatedPoints,updated:now.toISOString()});
+  // Store compact summaries and frozen predictions once per quarter-hour.
+  if(p.minute%15===0){
+   const summary=A.compactDay(p.day,updatedPoints);
+   tx.set(db.collection('dailySummaries').doc(p.day),summary);
+   const frozen=A.snapshot(p.day,now,count,projection);
+   if(frozen)tx.set(db.collection('forecastSnapshots').doc(minuteId),frozen);
+  }
+  if(correction.event)tx.set(db.collection('recountEvents').doc(minuteId),correction.event);
   tx.set(WEEKLY,{...nextWeekly,total:(weekly.total||0)+1});
   tx.set(STATUS,status);
  });
@@ -114,8 +124,13 @@ exports.getHistory=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
    response=H.historical(doc.exists?doc.data():{points:[]},date);
   }else{
    const lower=new Date(Date.parse(date+'T12:00:00Z')-60*86400000).toISOString().slice(0,10);
-   const snap=await db.collection('days').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
-   const records=snap.docs.map(d=>({...d.data(),date:d.id}));
+   const summaries=await db.collection('dailySummaries').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
+   let records=summaries.docs.map(d=>({...d.data(),date:d.id}));
+   // Transitional fallback while historical daily summaries are being built.
+   if(records.length<3){
+    const old=await db.collection('days').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
+    records=old.docs.map(d=>({...d.data(),date:d.id}));
+   }
    response=H.future(date,records);
   }
   res.json({ok:true,...response});
@@ -123,4 +138,26 @@ exports.getHistory=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   logger.error('getHistory failed',err);
   res.status(503).json({ok:false,error:'Unable to read historical observations right now.'});
  }
+});
+
+// Runs after midnight. Save out-of-sample scores without altering earlier forecasts.
+exports.scoreOccupancyForecasts=onSchedule({schedule:'15 2 * * *',timeZone:L.TZ,
+ region:REGION,memory:'256MiB',timeoutSeconds:90,maxInstances:1,serviceAccount:RUNTIME_SERVICE_ACCOUNT},async()=>{
+ const today=L.parts(new Date()).day;
+ const yesterday=new Date(today+'T12:00:00Z');
+ yesterday.setUTCDate(yesterday.getUTCDate()-1);
+ const date=yesterday.toISOString().slice(0,10);
+ const [raw,snaps,events]=await Promise.all([
+  db.collection('days').doc(date).get(),
+  db.collection('forecastSnapshots').where('date','==',date).get(),
+  db.collection('recountEvents').where('timestamp','>=',date+'T00:00:00').where('timestamp','<',new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString()).get()
+ ]);
+ // The event range above is UTC-based. A dated document prefix is more robust
+ // around DST and local-day boundaries; filter by local date as a safeguard.
+ const snapshots=snaps.docs.map(x=>x.data());
+ const recounts=events.docs.map(x=>x.data()).filter(x=>L.parts(new Date(x.timestamp)).day===date);
+ const points=raw.exists?raw.data().points||[]:[];
+ const scored=A.scoreDay(points,snapshots,recounts);
+ await db.collection('forecastScores').doc(date).set({...scored,date,updated:new Date().toISOString()});
+ logger.info('Scored daily forecasts',{date,snapshots:snapshots.length,observations:points.length});
 });
