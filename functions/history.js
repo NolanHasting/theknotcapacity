@@ -60,14 +60,28 @@ function future(date,records){
  });
  const points=[];
  for(let minute=range[0]*60;minute<range[1]*60;minute+=15){
-  const means=daily.map(r=>r.bins.get(minute)).filter(b=>b&&b.n>=5).map(b=>b.sum/b.n);
+  // Smooth the daily profile over neighboring 15-minute bins while giving the
+  // requested time most weight. Each day contributes at most one observation.
+  // This captures the lunch/evening curve without over-weighting busy polling.
+  const means=daily.map(r=>{
+   let total=0,weights=0;
+   for(const offset of [-30,-15,0,15,30]){
+    const bin=r.bins.get(minute+offset);
+    if(!bin||bin.n<5)continue;
+    const w=offset===0?1:Math.abs(offset)===15?.55:.2;
+    total+=bin.sum/bin.n*w;weights+=w;
+   }
+   return weights>=.55?total/weights:null;
+  }).filter(Number.isFinite);
   let avg=means.length?means.reduce((a,b)=>a+b,0)/means.length:null;
   if(avg!==null){
    const untilClose=range[1]*60-minute;
    avg=Math.max(0,Math.round(avg*Math.min(1,untilClose/60)));
   }
   const dispersion=means.length>=2?Math.sqrt(means.reduce((sum,x)=>sum+(x-avg)**2,0)/means.length):null;
-  const width=avg===null?null:Math.max(10,dispersion===null?20:Math.round(dispersion*1.25));
+  const elapsed=(minute-range[0]*60)/60;
+  const closing=Math.min(1,(range[1]*60-minute)/60);
+  const width=avg===null?null:Math.round(Math.max(5,dispersion===null?8:dispersion)*closing+11*Math.sqrt(elapsed)*closing);
   points.push({minute,count:avg,low:avg===null?null:Math.max(0,Math.round(avg-width)),high:avg===null?null:Math.round(avg+width),days:means.length});
  }
  points.push({minute:range[1]*60,count:0,low:0,high:0,days:0,assumedClose:true});
@@ -75,6 +89,6 @@ function future(date,records){
  return {mode:'future',date,points:observed.length?points:[],
   summary:{matchingWeekdays:same.length,referenceDays:baseline.length,coveredSlots:observed.length,totalSlots:range[1]*4-range[0]*4,
    possibleRecounts:analysis.state.resetCount||0,recountAdjusted:rate!==null},
-  basis,note:observed.length?('Based on '+basis+'. '+(rate===null?'Uses reported counts until more recounts are recorded.':'Adjusted for estimated departures between likely staff recounts.')+' Zero at closing is assumed.'):'Not enough history for this date.'};
+  basis,note:observed.length?('Based on '+basis+'. '+(rate===null?'Source-based profile.':'Adjusted from likely recounts.')+' Shaded range is illustrative. Closing is assumed empty.'):'Not enough history for this date.'};
 }
 module.exports={dateOnly,dailyBins,historical,future};

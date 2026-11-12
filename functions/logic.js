@@ -43,6 +43,26 @@ function slope(points,now,count){
  const denominator=rows.reduce((a,r,i)=>a+weights[i]*(r.x-mx)**2,0);
  return denominator>0?clamp(numerator/denominator*30,-30,30):null;
 }
+
+// Actual reported change over the past 30 minutes, not a trend extrapolation.
+// Require a reading within five minutes of the target timestamp to avoid
+// presenting misleading comparisons across missing collection periods.
+function reportedChange30(points,now=new Date()){
+ const rows=(points||[]).filter(x=>Number.isFinite(x.count)&&Number.isFinite(Date.parse(x.timestamp)))
+  .sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
+ if(rows.length<2)return null;
+ const latest=rows[rows.length-1],latestTime=Date.parse(latest.timestamp);
+ if(Math.abs(now.getTime()-latestTime)>4*60000)return null;
+ const target=latestTime-30*60000;
+ let prior=null,distance=Infinity;
+ for(const p of rows){
+  const diff=Math.abs(Date.parse(p.timestamp)-target);
+  if(diff<distance){distance=diff;prior=p;}
+ }
+ if(distance>5*60000)return null;
+ return {change:latest.count-prior.count,from:prior.timestamp,to:latest.timestamp};
+}
+
 function trend(rate,open){
  if(!open)return {key:'closed',label:'CLOSED HOURS'};
  if(rate==null)return {key:'learning',label:'LEARNING'};
@@ -121,17 +141,31 @@ function best(weekly,now=new Date(),liveForecast=null,forecastTimestamp=null){
  }
  return options.sort((a,b)=>a.average-b.average||a.hour-b.hour).slice(0,4);
 }
+// Learn the daily curve from matching weekdays when available, or from
+// other observed days when the matching weekday history is still sparse.
+function profileAt(weekly,p){
+ const own=typical(weekly,p);
+ if(own.average!==null&&own.days>=2)return {average:own.average,days:own.days,weight:Math.min(.75,.38+.05*own.days)};
+ let sum=0,weight=0;
+ for(let d=0;d<7;d++){
+  const v=typical(weekly,{dow:d,hour:p.hour});
+  if(v.average===null)continue;
+  const n=Math.max(1,v.days);
+  sum+=v.average*n;weight+=n;
+ }
+ return weight?{average:sum/weight,days:weight,weight:Math.min(.5,.3+.04*weight)}:{average:null,days:0,weight:0};
+}
 function forecast(count,rate,weekly,now,correction=null){
  const p=parts(now),minutes=remainingMinutes(p);
  if(minutes<=0||!Number.isFinite(count))return null;
- const start=typical(weekly,p),hasBaseline=start.average!==null&&start.days>=2;
+ const start=profileAt(weekly,p),hasBaseline=start.average!==null;
  const predicted=[];
  const steps=[0];for(let m=15;m<minutes;m+=15)steps.push(m);
  if(steps[steps.length-1]!==minutes)steps.push(minutes);
  // Source values above the policy reference of 100 are valid; do not truncate them.
  const safeStart=Math.max(0,Number.isFinite(correction?.estimatedNow)?correction.estimatedNow:count);
  for(const m of steps){
-  const at=parts(new Date(now.getTime()+m*60000)),target=typical(weekly,at);
+  const at=parts(new Date(now.getTime()+m*60000)),target=profileAt(weekly,at);
   // Trend impact saturates instead of being extrapolated linearly to closing.
   // Backtest on the initial three recorded dates: trend helps 15–30 minute
   // horizons but loses to persistence at 60 minutes. Shrink its effect to zero
@@ -140,9 +174,9 @@ function forecast(count,rate,weekly,now,correction=null){
   const drift=rate==null?0:trendWeight*rate/30*35*(1-Math.exp(-m/35));
   // Grow historical influence gradually, only when the comparable hour has
   // >=2 different days. With sparse history, default to persistence+smoothed trend.
-  const historicalDelta=hasBaseline&&target.days>=2&&target.average!==null?target.average-start.average:0;
-  const evidence=hasBaseline&&target.days>=2?Math.min(0.65,0.18+0.12*Math.min(start.days,target.days)):0;
-  const influence=1-Math.exp(-m/90);
+  const historicalDelta=hasBaseline&&target.average!==null?clamp(target.average-start.average,-80,80):0;
+  const evidence=hasBaseline&&target.average!==null?Math.min(start.weight,target.weight):0;
+  const influence=1-Math.exp(-m/65);
   // Force the projected occupancy to zero only at close. The last 75 minutes
   // taper toward closing; the first point always stays equal to the observation.
   const tillClose=minutes-m;
@@ -152,14 +186,16 @@ function forecast(count,rate,weekly,now,correction=null){
   const departures=departureRate>0?Math.min(m,60)*departureRate*0.45:0;
   const estimate=Math.max(0,Math.round((safeStart+(1-evidence)*drift+evidence*historicalDelta*influence-departures)*closure));
   // These are illustrative scenarios, not calibrated confidence intervals.
-  const spread=m===0||m===minutes?0:Math.min(35,8+5*Math.sqrt(m/60)+(hasBaseline?3:8))*closure;
+  // Illustrative prediction range, not yet a statistically calibrated interval.
+  // It widens farther ahead and narrows only for the scheduled closing taper.
+  const spread=m===0?0:Math.min(60,(hasBaseline?9:14)+12*Math.sqrt(m/60))*closure;
   predicted.push({minutes:m,count:estimate,low:Math.max(0,Math.round(estimate-spread)),high:Math.max(estimate,Math.round(estimate+spread))});
  }
  const hour=predicted.find(r=>r.minutes===60)||predicted.find(r=>r.minutes>=60)||predicted[predicted.length-1];
  return {current:count,estimatedStart:safeStart,projected:hour.count,change:hour.count-safeStart,closing:predicted[predicted.length-1].count,
   points:predicted,horizonMinutes:minutes,confidence:hasBaseline?'DEVELOPING':'EARLY',matchingDays:start.days,
-  method:Number.isFinite(correction?.estimatedNow)?'Recount-based estimate + recent movement':'Recent movement + limited history',
-  disclaimer:'Forecasts are estimates. Sudden drops may be staff recounts. The closing-time zero is a schedule assumption, not an observed reading.'};
+  method:hasBaseline?'Live count + historical daily pattern':'Live count + recent movement',intervalType:'illustrative',
+  disclaimer:'The shaded band shows a plausible range, not a calibrated confidence level. Zero at closing is assumed.'};
 }
 function summarize(status,day,week,now=new Date()){
  const recent=(day&&day.points)||[],p=parts(now);
@@ -167,10 +203,10 @@ function summarize(status,day,week,now=new Date()){
  const currentTypical=typical(week||{},p);
  const dataPoints=week&&week.total?week.total:0,count=current.count;
  return {...current,ok:true,max:MAX,percent:count==null?null:Math.round(count/MAX*100),
-  todayHistory:recent,history:recent.slice(-90),heatmap:heatmap(week||{}),bestTimes:best(week||{},now),
+  todayHistory:recent,history:recent.slice(-90),reportedChange30:reportedChange30(recent,now),heatmap:heatmap(week||{}),bestTimes:best(week||{},now),
   typicalNow:currentTypical.average,typicalSamples:currentTypical.samples,typicalDays:currentTypical.days,
   dataPoints,collectionStarted:week&&week.started||null,
   note:dataPoints<30?'Baseline building: early patterns are provisional.':dataPoints<500?'Early patterns emerging.':'Historical patterns are developing.',
   insight:current.open?`${count} people last counted. `+(currentTypical.average===null?'Same-hour history is still building.':`Typical for this weekday and hour: ${currentTypical.average} (${currentTypical.days} days).`):'Outside configured gym hours. CLOSED is based on the schedule.'};
 }
-module.exports={TZ,MAX,HOURS,parts,openNow,remainingMinutes,crowd,slope,trend,typical,forecast,addWeekly,heatmap,best,summarize};
+module.exports={TZ,MAX,HOURS,parts,openNow,remainingMinutes,crowd,slope,reportedChange30,trend,typical,forecast,addWeekly,heatmap,best,summarize};
