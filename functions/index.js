@@ -85,6 +85,7 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   response.lastSourceErrorAt=status.sourceErrorAt||null;
   response.sourceHealth=status.error?'fetch_failed':'ok';
   response.ok=true; // A delayed response is valid JSON: render its warning, not an API error.
+  response.bestTimes=L.best(weekly,new Date(),response.dataState==='live'?status.forecast:null,status.sourceUpdated);
   if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';}
   if(response.dataState==='delayed')response.warning='Source reading delayed; last known count only.';
   if(response.dataState==='offline')response.warning='Source unavailable; last known count is not reliable.';
