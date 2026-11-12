@@ -27,6 +27,18 @@ function dayChart(d){
  }
  const historyLine=history.map((p,i)=>((i&&Date.parse(p.timestamp)-Date.parse(history[i-1].timestamp)<=10*60000)?'L':'M')+x(Date.parse(p.timestamp)).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
  let shapes=`<path d="${historyLine}" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+ for(let i=1;i<history.length;i++){
+  const prev=history[i-1],cur=history[i],gap=(Date.parse(cur.timestamp)-Date.parse(prev.timestamp))/60000;
+  if(gap>0&&gap<=3&&prev.count-cur.count>=15){
+   shapes+=`<circle cx="${x(Date.parse(cur.timestamp)).toFixed(2)}" cy="${y(cur.count).toFixed(2)}" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Possible staff recount</title></circle>`;
+  }
+ }
+ if(d.dataState==='live'&&Number.isFinite(d.estimatedNow)&&Number.isFinite(nowTs)){
+  const src=history[history.length-1]?.count;
+  const xx=x(nowTs).toFixed(2),yy=y(d.estimatedNow).toFixed(2);
+  if(Number.isFinite(src))shapes+=`<line x1="${xx}" x2="${xx}" y1="${y(src).toFixed(2)}" y2="${yy}" stroke="#7dc7e6" stroke-dasharray="2 4" opacity=".75"/>`;
+  shapes+=`<circle cx="${xx}" cy="${yy}" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Estimated current crowd: ${Math.round(d.estimatedNow)}</title></circle>`;
+ }
  if(projected.length>1){
   const line=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
   const upper=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.high).toFixed(2)).join(' ');
