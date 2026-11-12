@@ -27,11 +27,12 @@ function dayChart(d){
  }
  const historyLine=history.map((p,i)=>((i&&Date.parse(p.timestamp)-Date.parse(history[i-1].timestamp)<=10*60000)?'L':'M')+x(Date.parse(p.timestamp)).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
  let shapes=`<path d="${historyLine}" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
- for(let i=1;i<history.length;i++){
-  const prev=history[i-1],cur=history[i],gap=(Date.parse(cur.timestamp)-Date.parse(prev.timestamp))/60000;
-  if(gap>0&&gap<=3&&prev.count-cur.count>=15){
-   shapes+=`<circle cx="${x(Date.parse(cur.timestamp)).toFixed(2)}" cy="${y(cur.count).toFixed(2)}" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Possible staff recount</title></circle>`;
-  }
+ for(const event of (d.recounts||[])){
+  const ts=Date.parse(event.timestamp);
+  if(!Number.isFinite(ts)||!Number.isFinite(event.count))continue;
+  const cx=x(ts).toFixed(2),cy=y(event.count).toFixed(2);
+  const info='Staff recount · '+time(event.timestamp)+' · '+event.count+' reported · down '+event.drop;
+  shapes+=`<path d="M${cx} ${(Number(cy)-6).toFixed(2)} l6 6 -6 6 -6 -6 Z" fill="#9FD39B" stroke="#111" stroke-width="1.5"><title>${esc(info)}</title></path>`;
  }
  if(projected.length>1){
   const line=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
@@ -50,6 +51,11 @@ function dayChart(d){
  }
  // Invisible touch targets keep the chart visually clean, but accessible.
  const markers=[];
+ for(const event of (d.recounts||[])){
+  if(!Number.isFinite(Date.parse(event.timestamp))||!Number.isFinite(event.count))continue;
+  const label='Staff recount · '+time(event.timestamp)+' · '+event.count+' reported · down '+event.drop;
+  markers.push('<circle class="chart-point" cx="'+x(Date.parse(event.timestamp)).toFixed(2)+'" cy="'+y(event.count).toFixed(2)+'" r="9" fill="transparent" tabindex="0" role="button" aria-label="'+esc(label)+'" data-info="'+esc(label)+'"/>');
+ }
  for(let i=0;i<history.length;i+=Math.max(1,Math.ceil(history.length/110))){
   const p=history[i],label=time(p.timestamp)+': '+p.count+' reported';
   markers.push('<circle class="chart-point" cx="'+x(Date.parse(p.timestamp)).toFixed(2)+'" cy="'+y(p.count).toFixed(2)+'" r="5" fill="transparent" tabindex="0" role="button" data-info="'+esc(label)+'"/>');
