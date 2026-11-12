@@ -180,3 +180,4 @@ exports.scoreOccupancyForecasts=onSchedule({schedule:'15 2 * * *',timeZone:L.TZ,
 // Separate private planner API, notification scheduler, and public event importer.
 // These do not alter the existing occupancy collection endpoint.
 Object.assign(exports,require('./planner'));
+Object.assign(exports,require('./sms'));
