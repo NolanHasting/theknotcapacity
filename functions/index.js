@@ -54,7 +54,7 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
   const nextWeekly=L.addWeekly(weekly,p,count);
   const projection=L.forecast(count,rate,nextWeekly,now,correction);
   const sample={timestamp:now.toISOString(),count};
-  const status={...L.crowd(count,true),open:true,count,trend:direction.key,trendLabel:direction.label,
+  const status={...L.crowd(count,true),open:true,count,trend:direction.key,trendLabel:direction.label,trendArrow:direction.arrow,
    trendPer30:rate,forecast:projection,updated:now.toISOString(),sourceUpdated:now.toISOString(),
    lastLogged:now.toISOString(),lastMinuteId:minuteId,recent:[...oldRecent,sample].slice(-50),
    recountModel:correction.state,estimatedNow:correction.estimatedNow,
@@ -96,8 +96,13 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   response.lastSourceErrorAt=status.sourceErrorAt||null;
   response.sourceHealth=status.error?'fetch_failed':'ok';
   response.ok=true; // A delayed response is valid JSON: render its warning, not an API error.
+  // Normalize older persisted LEARNING states for widgets and the web client.
+  if(response.dataState==='live'){
+   const direction=L.trend(Number.isFinite(status.trendPer30)?status.trendPer30:null,true);
+   response.trend=direction.key;response.trendLabel=direction.label;response.trendArrow=direction.arrow;
+  }
   response.bestTimes=L.best(weekly,new Date(),response.dataState==='live'?status.forecast:null,status.sourceUpdated);
-  if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';}
+  if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';response.trendArrow=null;}
   if(response.dataState==='delayed')response.warning='Source reading delayed; last known count only.';
   if(response.dataState==='offline')response.warning='Source unavailable; last known count is not reliable.';
   if(status.error&&response.dataState!=='closed')response.warning=(response.warning||'')+' Last collection error: '+String(status.error).slice(0,160);
