@@ -43,6 +43,26 @@ function slope(points,now,count){
  const denominator=rows.reduce((a,r,i)=>a+weights[i]*(r.x-mx)**2,0);
  return denominator>0?clamp(numerator/denominator*30,-30,30):null;
 }
+
+// Actual reported change over the past 30 minutes, not a trend extrapolation.
+// Require a reading within five minutes of the target timestamp to avoid
+// presenting misleading comparisons across missing collection periods.
+function reportedChange30(points,now=new Date()){
+ const rows=(points||[]).filter(x=>Number.isFinite(x.count)&&Number.isFinite(Date.parse(x.timestamp)))
+  .sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
+ if(rows.length<2)return null;
+ const latest=rows[rows.length-1],latestTime=Date.parse(latest.timestamp);
+ if(Math.abs(now.getTime()-latestTime)>4*60000)return null;
+ const target=latestTime-30*60000;
+ let prior=null,distance=Infinity;
+ for(const p of rows){
+  const diff=Math.abs(Date.parse(p.timestamp)-target);
+  if(diff<distance){distance=diff;prior=p;}
+ }
+ if(distance>5*60000)return null;
+ return {change:latest.count-prior.count,from:prior.timestamp,to:latest.timestamp};
+}
+
 function trend(rate,open){
  if(!open)return {key:'closed',label:'CLOSED HOURS'};
  if(rate==null)return {key:'learning',label:'LEARNING'};
@@ -167,10 +187,10 @@ function summarize(status,day,week,now=new Date()){
  const currentTypical=typical(week||{},p);
  const dataPoints=week&&week.total?week.total:0,count=current.count;
  return {...current,ok:true,max:MAX,percent:count==null?null:Math.round(count/MAX*100),
-  todayHistory:recent,history:recent.slice(-90),heatmap:heatmap(week||{}),bestTimes:best(week||{},now),
+  todayHistory:recent,history:recent.slice(-90),reportedChange30:reportedChange30(recent,now),heatmap:heatmap(week||{}),bestTimes:best(week||{},now),
   typicalNow:currentTypical.average,typicalSamples:currentTypical.samples,typicalDays:currentTypical.days,
   dataPoints,collectionStarted:week&&week.started||null,
   note:dataPoints<30?'Baseline building: early patterns are provisional.':dataPoints<500?'Early patterns emerging.':'Historical patterns are developing.',
   insight:current.open?`${count} people last counted. `+(currentTypical.average===null?'Same-hour history is still building.':`Typical for this weekday and hour: ${currentTypical.average} (${currentTypical.days} days).`):'Outside configured gym hours. CLOSED is based on the schedule.'};
 }
-module.exports={TZ,MAX,HOURS,parts,openNow,remainingMinutes,crowd,slope,trend,typical,forecast,addWeekly,heatmap,best,summarize};
+module.exports={TZ,MAX,HOURS,parts,openNow,remainingMinutes,crowd,slope,reportedChange30,trend,typical,forecast,addWeekly,heatmap,best,summarize};
