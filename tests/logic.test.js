@@ -71,4 +71,36 @@ assert.equal(future.points.at(-1).count,0);
 assert.equal(future.points.find(p=>p.minute===600).count,70); // General recent-days fallback
 assert.equal(future.summary.referenceDays,2);
 assert.equal(H.future('2026-11-17',[]).points.length,0);
+
+const R=require('../functions/recounts');
+const resetStart=new Date('2026-11-10T17:00:00Z');
+let model={};
+let previous={timestamp:'2026-11-10T16:59:00Z',count:100};
+let out=R.update(model,previous,62,resetStart);
+assert.equal(out.isReset,true);
+assert.equal(out.estimatedNow,null);
+model=out.state;
+const after=new Date('2026-11-10T18:00:00Z');
+out=R.update(model,{timestamp:'2026-11-10T17:59:00Z',count:112},72,after);
+assert.equal(out.isReset,true);
+assert.ok(out.departureRate>0);
+assert.equal(out.estimatedNow,72);
+model=out.state;
+out=R.update(model,{timestamp:'2026-11-10T18:29:00Z',count:90},91,new Date('2026-11-10T18:30:00Z'));
+assert.equal(out.isReset,false);
+assert.ok(out.estimatedNow<91);
+const anchored=L.forecast(91,10,{},new Date('2026-11-10T18:30:00Z'),out);
+assert.equal(anchored.points[0].count,out.estimatedNow);
+assert.equal(anchored.points.at(-1).count,0);
+// A sharp downward reset should not create a "leaving fast" trend.
+const inspected=R.inspect([
+ {timestamp:'2026-11-10T16:59:00Z',count:100},
+ {timestamp:'2026-11-10T17:00:00Z',count:62},
+ {timestamp:'2026-11-10T17:59:00Z',count:112},
+ {timestamp:'2026-11-10T18:00:00Z',count:72}
+]);
+assert.equal(inspected.state.resetCount,2);
+const enhanced=H.future('2026-11-17',historyRecords);
+assert.ok(enhanced.points.every(p=>p.count===null||(p.low<=p.count&&p.high>=p.count)));
+assert.deepEqual(enhanced.points.at(-1),{minute:1380,count:0,low:0,high:0,days:0,assumedClose:true});
 console.log('All backend logic tests passed.');
