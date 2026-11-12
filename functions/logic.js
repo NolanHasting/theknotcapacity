@@ -112,7 +112,11 @@ function forecast(count,rate,weekly,now){
  for(const m of steps){
   const at=parts(new Date(now.getTime()+m*60000)),target=typical(weekly,at);
   // Trend impact saturates instead of being extrapolated linearly to closing.
-  const drift=rate==null?0:rate/30*35*(1-Math.exp(-m/35));
+  // Backtest on the initial three recorded dates: trend helps 15–30 minute
+  // horizons but loses to persistence at 60 minutes. Shrink its effect to zero
+  // by the one-hour horizon until enough days exist for a stronger model.
+  const trendWeight=clamp(0.8-m/75,0,0.6);
+  const drift=rate==null?0:trendWeight*rate/30*35*(1-Math.exp(-m/35));
   // Grow historical influence gradually, only when the comparable hour has
   // >=2 different days. With sparse history, default to persistence+smoothed trend.
   const historicalDelta=hasBaseline&&target.days>=2&&target.average!==null?target.average-start.average:0;
