@@ -26,9 +26,25 @@
 <div class="chartnote" id="dayNote">Waiting for readings.</div>
 <div class="legend"><span><i></i>Observed count</span><span><i class="forecast"></i>Forecast to closing</span><span><i class="band"></i>Illustrative spread, not confidence interval</span></div></article>
 </section>
+<div class="section-title"><h2>Explore occupancy by date</h2><p>Choose a past date for actual readings or a future date for an early, history-based estimate.</p></div>
+<section class="panel history-panel">
+ <div class="history-toolbar">
+  <div><div class="eyebrow">DATE EXPLORER</div><div class="history-control">
+   <button class="refresh" id="historyPrevious" aria-label="Previous day">←</button>
+   <input id="historyDate" type="date" aria-label="Choose occupancy date">
+   <button class="refresh" id="historyNext" aria-label="Next day">→</button>
+  </div></div>
+  <div class="eyebrow" id="historyLegend">OBSERVED DATA</div>
+ </div>
+ <div id="historySummary" class="history-summary" aria-live="polite">Loading history…</div>
+ <div class="chart-scroll" role="region" aria-label="Scroll to view selected occupancy history">
+  <svg id="historyChart" class="chart history-chart" viewBox="0 0 760 285" role="img" aria-label="Selected day's observed or projected occupancy by time of day"></svg>
+ </div>
+ <p id="historyNote" class="fine">The source may count member entries before staff manually reconcile occupancy. Future profiles are exploratory and assume zero occupancy at closing.</p>
+</section>
 <div class="tabs"><button class="tab active" data-tab="insights">Insights</button><button class="tab" data-tab="patterns">Weekly patterns</button><button class="tab" data-tab="best">Best times</button></div>
 <section class="view active" id="insights"><article class="panel"><div class="eyebrow">WHAT THE NUMBERS MEAN</div><p class="insight" id="insight">Analyzing today's readings.</p><div class="fine" id="logged">Last logged reading —</div></article></section>
 <section class="view" id="patterns"><article class="panel"><div class="charthead"><h3>Average occupancy by weekday and hour</h3><span>HISTORICAL</span></div><p class="fine">Historical averages by weekday and hour. Hover over a cell for the number of days and readings; patterns with limited coverage are preliminary.</p><div class="heat" id="heatmap"></div><div class="heat-scale" aria-label="Occupancy color scale from zero to 100 plus people"><span>0 · QUIETER</span><div class="heat-gradient"></div><span>100+ · BUSIER</span></div><p class="fine">Dark gray indicates no recorded history. Colors use twelve occupancy levels instead of four.</p></article></section>
 <section class="view" id="best"><article class="panel"><div class="charthead"><h3>Upcoming quieter hours today</h3><span>HISTORICAL · PROVISIONAL</span></div><div class="best" id="besttimes"></div></article></section>
 <footer><span>NOLAN HASTING</span><span>Count Updated Every Minute · Independent Project</span></footer>
-</main><script defer src="/app.js"></script></body></html>
+</main><script defer src="/app.js"></script><script defer src="/history.js"></script></body></html>
