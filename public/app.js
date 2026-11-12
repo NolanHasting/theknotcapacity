@@ -44,16 +44,28 @@ function dayChart(d){
  $('forecastType').textContent=forecast?forecast.confidence+' ESTIMATE':'OBSERVED ONLY';
  $('dayNote').textContent=history.length+' readings today'+(forecast?' · predicted at closing: '+forecast.closing+' · forecast is exploratory with an illustrative, uncalibrated spread.':' · forecast unavailable until live data is restored.');
 }
+const HEAT_COLORS=[
+ '#123f32','#196047','#257b4d','#40945b',
+ '#65a45b','#96ac52','#c1a248','#d88c36',
+ '#dd7130','#d9582e','#c83b34','#a51f3d'
+];
+function heatColor(value){
+ if(!Number.isFinite(value))return '#202020';
+ // 12 equally spaced capacity bands; >100 stays in the hottest band.
+ return HEAT_COLORS[Math.min(HEAT_COLORS.length-1,Math.max(0,Math.floor(Math.max(0,value)/100*HEAT_COLORS.length)))];
+}
 function renderHeat(cells){
  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+ const indexed=new Map((cells||[]).map(x=>[x.dayIndex+'-'+x.hour,x]));
  let html='<div></div>'+days.map(d=>'<div>'+d+'</div>').join('');
  for(let h=7;h<23;h++){
   html+='<div>'+hourLabel(h).replace('00 ','')+'</div>';
   for(let d=0;d<7;d++){
-   const v=(cells||[]).find(x=>x.dayIndex===d&&x.hour===h);
-   const color=!v||v.average===null?'#161616':v.average<=25?'#1c643a':v.average<=50?'#427b49':v.average<=75?'#9b6c24':'#a53333';
-   const title=v&&v.average!==null?`${days[d]} ${hourLabel(h)} · ${v.average} average · ${v.days||0} days · ${v.samples} readings`:'No data';
-   html+='<div class="cell" style="background:'+color+'" title="'+esc(title)+'"></div>';
+   const v=indexed.get(d+'-'+h);
+   const recorded=v&&Number.isFinite(v.average);
+   const color=recorded?heatColor(v.average):'#202020';
+   const title=recorded?`${days[d]} ${hourLabel(h)} · ${v.average} average occupants · ${v.days||0} matching days · ${v.samples} readings`:'No readings recorded for this hour';
+   html+='<div class="cell" style="background:'+color+'" title="'+esc(title)+'" aria-label="'+esc(title)+'"></div>';
   }
  }
  $('heatmap').innerHTML=html;
