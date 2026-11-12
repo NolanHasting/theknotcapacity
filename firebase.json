@@ -15,6 +15,20 @@
     ],
     "rewrites": [
       {
+        "source": "/api/sms/config",
+        "function": {
+          "functionId": "smsSubscribe",
+          "region": "us-east1"
+        }
+      },
+      {
+        "source": "/api/sms/inbound",
+        "function": {
+          "functionId": "smsInbound",
+          "region": "us-east1"
+        }
+      },
+      {
         "source": "/api/planner",
         "function": {
           "functionId": "plannerApi",
