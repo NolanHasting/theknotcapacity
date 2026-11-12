@@ -27,11 +27,11 @@ function slope(points,now,count){
  const rows=[...(points||[]),{timestamp:now.toISOString(),count}].filter(r=>Number.isFinite(r.count)&&Number.isFinite(Date.parse(r.timestamp)))
   .map(r=>({x:(Date.parse(r.timestamp)-latest)/60000,y:r.count}))
   .filter(r=>r.x>=-45&&r.x<=0).sort((a,b)=>a.x-b.x);
- // Large rapid drops are likely a staff reconciliation, not a reliable departure rate.
+ // Any rapid decrease can be a staff reconciliation, not a sustained departure trend.
  // Estimate movement only from the latest post-reconciliation segment.
  let reset=0;
  for(let i=1;i<rows.length;i++){
-  if(rows[i].x-rows[i-1].x<=3 && rows[i-1].y-rows[i].y>=15)reset=i;
+  if(rows[i].x-rows[i-1].x>0&&rows[i].x-rows[i-1].x<=3 && rows[i-1].y>rows[i].y)reset=i;
  }
  if(reset)rows.splice(0,reset);
  if(rows.length<3||rows[rows.length-1].x-rows[0].x<10)return null;
