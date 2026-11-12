@@ -81,24 +81,37 @@ function typical(weekly,p){
  }
  return {average:Math.round(a.sum/a.n),samples:a.n,days:a.days||0};
 }
-function addWeekly(weekly,p,count){
- const key=`${p.dow}-${p.hour}`,prev=weekly[key]||{sum:0,n:0,days:0,lastDay:''};
+function updateBucket(prev,p,count){
+ prev=prev||{sum:0,n:0,days:0,lastDay:''};
  let completedDays,completedMeanSum,activeSum,activeN;
  if(Number.isFinite(prev.completedMeanSum)&&Number.isFinite(prev.completedDays)){
   completedDays=prev.completedDays;completedMeanSum=prev.completedMeanSum;
   activeSum=prev.activeSum||0;activeN=prev.activeN||0;
-  if(prev.lastDay&&prev.lastDay!==p.day&&activeN){completedMeanSum+=activeSum/activeN;completedDays++;activeSum=0;activeN=0;}
+  if(prev.lastDay&&prev.lastDay!==p.day&&activeN){
+   completedMeanSum+=activeSum/activeN;completedDays++;activeSum=0;activeN=0;
+  }
  }else{
-  // Migration: approximate legacy prior day means with the previously known
-  // average, while tracking all subsequently collected days exactly.
   const priorDays=Math.max(0,(prev.days||0)-(prev.lastDay===p.day?1:0));
-  completedDays=priorDays;completedMeanSum=priorDays&&prev.n?priorDays*(prev.sum/prev.n):0;
+  completedDays=priorDays;
+  completedMeanSum=priorDays&&prev.n?priorDays*(prev.sum/prev.n):0;
   activeSum=0;activeN=0;
  }
  activeSum+=count;activeN++;
- return {...weekly,[key]:{sum:prev.sum+count,n:prev.n+1,days:completedDays+1,lastDay:p.day,
-  completedDays,completedMeanSum,activeSum,activeN}};
+ return {sum:prev.sum+count,n:prev.n+1,days:completedDays+1,lastDay:p.day,
+  completedDays,completedMeanSum,activeSum,activeN};
 }
+function addWeekly(weekly,p,count){
+ const key=`${p.dow}-${p.hour}`;
+ const quarterKey=`${p.dow}-${p.hour*4+Math.floor(p.minute/15)}`;
+ const quarter=weekly.quarter||{};
+ return {...weekly,[key]:updateBucket(weekly[key],p,count),
+  quarter:{...quarter,[quarterKey]:updateBucket(quarter[quarterKey],p,count)}};
+}
+function quarterTypical(weekly,p){
+ const slot=p.hour*4+Math.floor((p.minute||0)/15);
+ return typical(weekly.quarter||{},{dow:p.dow,hour:slot});
+}
+
 function heatmap(weekly){
  const cells=[];
  for(let d=0;d<7;d++)for(let h=7;h<23;h++){
@@ -144,16 +157,27 @@ function best(weekly,now=new Date(),liveForecast=null,forecastTimestamp=null){
 // Learn the daily curve from matching weekdays when available, or from
 // other observed days when the matching weekday history is still sparse.
 function profileAt(weekly,p){
+ const q=quarterTypical(weekly,p);
+ if(q.average!==null&&q.days>=2)
+  return {average:q.average,days:q.days,weight:Math.min(.78,.36+.06*q.days)};
+ const qSlot=p.hour*4+Math.floor((p.minute||0)/15);
+ let sum=0,days=0;
+ for(let d=0;d<7;d++){
+  const t=typical(weekly.quarter||{},{dow:d,hour:qSlot});
+  if(t.average===null)continue;
+  const n=Math.max(1,t.days);sum+=t.average*n;days+=n;
+ }
+ if(days>=1)return {average:sum/days,days,weight:Math.min(.52,.24+.05*days)};
+ // Legacy hourly fallback while new quarter-hour statistics accumulate.
  const own=typical(weekly,p);
- if(own.average!==null&&own.days>=2)return {average:own.average,days:own.days,weight:Math.min(.75,.38+.05*own.days)};
- let sum=0,weight=0;
+ if(own.average!==null&&own.days>=2)return {average:own.average,days:own.days,weight:Math.min(.6,.3+.04*own.days)};
+ sum=0;days=0;
  for(let d=0;d<7;d++){
   const v=typical(weekly,{dow:d,hour:p.hour});
   if(v.average===null)continue;
-  const n=Math.max(1,v.days);
-  sum+=v.average*n;weight+=n;
+  const n=Math.max(1,v.days);sum+=v.average*n;days+=n;
  }
- return weight?{average:sum/weight,days:weight,weight:Math.min(.5,.3+.04*weight)}:{average:null,days:0,weight:0};
+ return days?{average:sum/days,days,weight:Math.min(.42,.2+.04*days)}:{average:null,days:0,weight:0};
 }
 function forecast(count,rate,weekly,now,correction=null){
  const p=parts(now),minutes=remainingMinutes(p);
