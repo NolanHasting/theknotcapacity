@@ -8,7 +8,7 @@ The ZIP contains:
 - `firestore-history.json`: day documents and current/weekly Firestore summaries
 - `summary.json`: coverage, first and last timestamps, maximum and overall mean
 
-The workflow uses the same `FIREBASE_SERVICE_ACCOUNT_THEKNOTCAPACITY` secret as the existing Firebase deployment. Its identity needs **Cloud Datastore User** or an equivalent Firestore read permission. No Firestore security rules are loosened. A GitHub Actions artifact is accessible to people with access to workflow artifacts on the repository and expires after 3 days; avoid forwarding the archive publicly.
+The workflow uses the same `FIREBASE_SERVICE_ACCOUNT_THEKNOTCAPACITY` secret as the existing Firebase deployment. Its identity needs **Cloud Datastore User** or an equivalent Firestore read permission. No Firestore security rules are loosened. Because this is a public GitHub repository, exported data **must be encrypted** before uploading as an artifact. The workflow refuses to upload raw data without the required encryption password; its encrypted artifact expires after 1 day. Keep the password separate from the archive.
 
 To export on a trusted local machine instead, from the repository root:
 
