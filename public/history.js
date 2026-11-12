@@ -61,6 +61,15 @@
   }
   html+='<line x1="'+left+'" x2="'+right+'" y1="'+y(100)+'" y2="'+y(100)+'" stroke="#cc7676" stroke-dasharray="5 5" opacity=".8"/>';
   html+='<path d="'+path+'" stroke="'+(isFuture?'#f0c468':'#fff')+'" stroke-width="2.4" fill="none" stroke-linejoin="round" stroke-linecap="round"'+(isFuture?' stroke-dasharray="6 4"':'')+'/>';
+  if(!isFuture){
+   for(let i=1;i<source.length;i++){
+    const a=source[i-1],b=source[i];
+    const elapsed=(Date.parse(b.timestamp)-Date.parse(a.timestamp))/60000;
+    if(elapsed>0&&elapsed<=3&&a.count-b.count>=15){
+     html+='<circle cx="'+x(b.minute)+'" cy="'+y(b.count)+'" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Possible staff recount</title></circle>';
+    }
+   }
+  }
   if(isFuture){
    for(const p of observed){
     html+='<circle cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="2.5" fill="#f0c468"><title>'+safe(tick(p.minute))+': '+p.count+' estimate · '+p.days+' past day(s)'+(p.assumedClose?' · closing assumption':'')+'</title></circle>';
