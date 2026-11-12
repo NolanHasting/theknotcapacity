@@ -29,7 +29,8 @@ function historical(doc,date){
  const values=points.map(x=>x.count), bins=dailyBins({...doc,date});
  return {mode:'historical',date,points,quarterHours:Array.from(bins,([slot,b])=>({minute:slot,count:Math.round(b.sum/b.n),samples:b.n})).sort((a,b)=>a.minute-b.minute),
   summary:{readings:values.length,average:values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length*10)/10:null,min:values.length?Math.min(...values):null,max:values.length?Math.max(...values):null},
-  note:'Source readings. Large drops may reflect staff recounts.'};
+  recounts:R.groupDrops(points),
+  note:'Reported counts and staff recounts.'};
 }
 function weekdayOf(date){return L.parts(new Date(date+'T12:00:00Z')).dow;}
 function samples(bin){return Math.max(1,bin.samples||1);}
@@ -47,7 +48,7 @@ function future(date,records){
  const analysis=R.inspect(all);
  const rate=Number.isFinite(analysis.state.departuresPerMinute)&&analysis.state.rateSamples>=2?
   analysis.state.departuresPerMinute:null;
- const resets=analysis.results.filter(v=>v.isReset).map(v=>Date.parse(v.timestamp));
+ const resets=analysis.events.map(v=>Date.parse(v.timestamp));
  const daily=baseline.map(r=>{
   if(Array.isArray(r.bins)&&r.bins.length){
    return {date:r.date,bins:new Map(r.bins.filter(x=>Number.isFinite(x.minute)&&Number.isFinite(x.count))
