@@ -82,10 +82,11 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
  if(req.method!=='GET'){res.status(405).json({ok:false,error:'GET only'});return;}
  try{
   const p=L.parts(new Date());
-  const [s,d,w]=await Promise.all([STATUS.get(),db.collection('days').doc(p.day).get(),WEEKLY.get()]);
+  const [s,d,w,a]=await Promise.all([STATUS.get(),db.collection('days').doc(p.day).get(),WEEKLY.get(),db.collection('system').doc('forecastAccuracy').get()]);
   if(!s.exists){res.status(503).set('Cache-Control','no-store').json({ok:false,error:'No reading exists yet. Check that collectOccupancy is deployed, enabled, and running in Firebase Scheduler.'});return;}
   const status=s.data(),weekly=w.exists?w.data():{};
   let response=L.summarize(status,d.exists?d.data():{},weekly);
+  response.forecastAccuracy=a.exists?a.data():null;
   const age=(Date.now()-Date.parse(status.sourceUpdated||''))/60000;
   // Display a warning if source readings are old. Never silently claim LIVE.
   response.sourceAgeMinutes=Number.isFinite(age)?Math.round(age):null;
@@ -150,7 +151,7 @@ exports.scoreOccupancyForecasts=onSchedule({schedule:'15 2 * * *',timeZone:L.TZ,
  const [raw,snaps,events]=await Promise.all([
   db.collection('days').doc(date).get(),
   db.collection('forecastSnapshots').where('date','==',date).get(),
-  db.collection('recountEvents').where('timestamp','>=',date+'T00:00:00').where('timestamp','<',new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString()).get()
+  db.collection('recountEvents').orderBy(FieldPath.documentId()).startAt(date+'_').endAt(date+'_\uf8ff').get()
  ]);
  // The event range above is UTC-based. A dated document prefix is more robust
  // around DST and local-day boundaries; filter by local date as a safeguard.
@@ -158,6 +159,10 @@ exports.scoreOccupancyForecasts=onSchedule({schedule:'15 2 * * *',timeZone:L.TZ,
  const recounts=events.docs.map(x=>x.data()).filter(x=>L.parts(new Date(x.timestamp)).day===date);
  const points=raw.exists?raw.data().points||[]:[];
  const scored=A.scoreDay(points,snapshots,recounts);
- await db.collection('forecastScores').doc(date).set({...scored,date,updated:new Date().toISOString()});
+ const updated=new Date().toISOString();
+ const batch=db.batch();
+ batch.set(db.collection('forecastScores').doc(date),{...scored,date,updated});
+ batch.set(db.collection('system').doc('forecastAccuracy'),{...scored,date,updated});
+ await batch.commit();
  logger.info('Scored daily forecasts',{date,snapshots:snapshots.length,observations:points.length});
 });
