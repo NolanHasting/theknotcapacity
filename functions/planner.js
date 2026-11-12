@@ -53,7 +53,7 @@ async function getPlanner(req,res){
  if(kind==='events'){
   const events=await db.collection('plannerPublic').doc('events').get();
   res.json({ok:true,events:events.exists?events.data().events||[]:[],updated:events.exists?events.data().updated:null,
-   eventsUrl:'https://climbtheknot.com/events/',closuresUrl:'https://climbtheknot.com/closures/'});
+   eventsUrl:'https://climbtheknot.com/events/',closuresUrl:'https://climbtheknot.com/closures/',calendarUrl:'https://portal.climbtheknot.com/gnv/n/calendar'});
   return;
  }
  const u=await verified(req),p=await ensureProfile(u);
@@ -77,13 +77,15 @@ async function postPlanner(req,res){
   // Only a recent login can destroy private account data.
   const authAge=Date.now()-(Number(u.auth_time)||0)*1000;
   if(!Number.isFinite(authAge)||authAge>10*60*1000)bad(403,'Sign out and sign back in before deleting your account.');
-  const [plans,push,requests]=await Promise.all([
+  const [plans,push,requests,sent]=await Promise.all([
    ref.collection('plans').limit(100).get(),
    ref.collection('pushTokens').limit(100).get(),
-   ref.collection('requests').limit(100).get()
+   ref.collection('requests').limit(100).get(),
+   ref.collection('sentRequests').limit(100).get()
   ]);
   const batch=db.batch();
-  for(const doc of [...plans.docs,...push.docs,...requests.docs])batch.delete(doc.ref);
+  for(const doc of [...plans.docs,...push.docs,...requests.docs,...sent.docs])batch.delete(doc.ref);
+  for(const doc of sent.docs)batch.delete(profileRef(doc.id).collection('requests').doc(u.uid));
   for(const friendId of (profile.friends||[])){
    const other=profileRef(friendId),doc=await other.get();
    if(doc.exists)batch.update(other,{friends:FieldValue.arrayRemove(u.uid)});
@@ -144,9 +146,12 @@ async function postPlanner(req,res){
   const now=new Date(),last=Date.parse(profile.lastRequestAt||'');
   if(Number.isFinite(last)&&now.getTime()-last<60000)bad(429,'Please try again in a minute');
   // Never reveal recipient's profile or plan without acceptance.
-  await profileRef(recipient).collection('requests').doc(u.uid).set({
+  const sendBatch=db.batch();
+  sendBatch.set(profileRef(recipient).collection('requests').doc(u.uid),{
    name:profile.displayName||'Climber',createdAt:now.toISOString()});
-  await ref.update({lastRequestAt:now.toISOString()});
+  sendBatch.set(ref.collection('sentRequests').doc(recipient),{createdAt:now.toISOString()});
+  sendBatch.update(ref,{lastRequestAt:now.toISOString()});
+  await sendBatch.commit();
   res.json({ok:true});return;
  }
  if(action==='friend.accept'||action==='friend.reject'){
@@ -154,7 +159,7 @@ async function postPlanner(req,res){
   if(!validId(other)||other===u.uid)bad(400,'Invalid request');
   const request=ref.collection('requests').doc(other);
   if(action==='friend.reject'){
-   await request.delete();res.json({ok:true});return;
+   const b=db.batch();b.delete(request);b.delete(profileRef(other).collection('sentRequests').doc(u.uid));await b.commit();res.json({ok:true});return;
   }
   await db.runTransaction(async tx=>{
    const [ask,self,friend]=await Promise.all([tx.get(request),tx.get(ref),tx.get(profileRef(other))]);
@@ -163,6 +168,7 @@ async function postPlanner(req,res){
    tx.update(ref,{friends:FieldValue.arrayUnion(other)});
    tx.update(profileRef(other),{friends:FieldValue.arrayUnion(u.uid)});
    tx.delete(request);
+   tx.delete(profileRef(other).collection('sentRequests').doc(u.uid));
   });
   res.json({ok:true});return;
  }
