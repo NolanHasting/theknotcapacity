@@ -12,7 +12,7 @@ function validPrefs(p){
  if(!p||typeof p!=='object'||Array.isArray(p))throw Error('Invalid preferences');
  if(!Array.isArray(p.days)||!p.days.length||p.days.length>7||
    new Set(p.days).size!==p.days.length||p.days.some(x=>!Number.isInteger(x)||x<0||x>6))throw Error('Select climbing days');
- if(!Number.isInteger(p.start)||!Number.isInteger(p.end)||p.start<0||p.end>1440||
+ if(!Number.isInteger(p.start)||!Number.isInteger(p.end)||p.start<0||p.start>=1440||p.end>1440||
     p.start>=p.end)throw Error('Choose a valid time range');
  for(const k of ['below','above']){
   if(p[k]!==null&&(!Number.isInteger(p[k])||p[k]<5||p[k]>200))throw Error('Choose a threshold from 5 to 200');
