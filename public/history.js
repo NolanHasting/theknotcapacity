@@ -62,18 +62,18 @@
   html+='<line x1="'+left+'" x2="'+right+'" y1="'+y(100)+'" y2="'+y(100)+'" stroke="#cc7676" stroke-dasharray="5 5" opacity=".8"/>';
   html+='<path d="'+path+'" stroke="'+(isFuture?'#f0c468':'#fff')+'" stroke-width="2.4" fill="none" stroke-linejoin="round" stroke-linecap="round"'+(isFuture?' stroke-dasharray="6 4"':'')+'/>';
   if(!isFuture){
+   for(let i=0;i<source.length;i+=Math.max(1,Math.ceil(source.length/130))){
+    const p=source[i];
+    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="5" fill="transparent" stroke="none" tabindex="0" role="button" data-info="'+safe(tick(p.minute)+': '+p.count+' reported')+'"/>';
+   }
+  }
+  if(!isFuture){
    for(const event of (data.recounts||[])){
     if(!Number.isFinite(event.count)||!Number.isFinite(Date.parse(event.timestamp)))continue;
     const mx=x(localMinute(event.timestamp)),my=y(event.count);
     const info='Staff recount · '+tick(localMinute(event.timestamp))+' · '+event.count+' reported · down '+event.drop;
     html+='<path d="M'+mx+' '+(my-6)+' l6 6 -6 6 -6 -6 Z" fill="#9FD39B" stroke="#111" stroke-width="1.5"><title>'+safe(info)+'</title></path>';
     html+='<circle class="chart-point" cx="'+mx+'" cy="'+my+'" r="10" fill="transparent" tabindex="0" role="button" aria-label="'+safe(info)+'" data-info="'+safe(info)+'"/>';
-   }
-  }
-  if(!isFuture){
-   for(let i=0;i<source.length;i+=Math.max(1,Math.ceil(source.length/130))){
-    const p=source[i];
-    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="5" fill="transparent" stroke="none" tabindex="0" role="button" data-info="'+safe(tick(p.minute)+': '+p.count+' reported')+'"/>';
    }
   }
   if(isFuture){
