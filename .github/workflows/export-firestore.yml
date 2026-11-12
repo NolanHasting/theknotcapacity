@@ -1,0 +1,54 @@
+name: Export historical Firestore occupancy data
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci --prefix functions
+      - name: Configure Firebase read credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THEKNOTCAPACITY }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Missing FIREBASE_SERVICE_ACCOUNT_THEKNOTCAPACITY"
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firestore-export-sa.json"
+          chmod 600 "$RUNNER_TEMP/firestore-export-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firestore-export-sa.json" >> "$GITHUB_ENV"
+      - name: Export Firestore data
+        run: node functions/export-firestore.js
+      - name: Encrypt sensitive export before artifact upload
+        env:
+          EXPORT_ENCRYPTION_PASSWORD: ${{ secrets.EXPORT_ENCRYPTION_PASSWORD }}
+        run: |
+          if [ -z "$EXPORT_ENCRYPTION_PASSWORD" ]; then
+            echo "::error::Set EXPORT_ENCRYPTION_PASSWORD in GitHub Actions secrets before exporting."
+            exit 1
+          fi
+          tar -czf "$RUNNER_TEMP/knot-history.tar.gz" -C exports .
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+            -in "$RUNNER_TEMP/knot-history.tar.gz" \
+            -out "$RUNNER_TEMP/knot-history.tar.gz.enc" \
+            -pass env:EXPORT_ENCRYPTION_PASSWORD
+          mkdir -p encrypted-export
+          mv "$RUNNER_TEMP/knot-history.tar.gz.enc" encrypted-export/
+      - name: Upload encrypted workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knot-firestore-export-encrypted
+          path: encrypted-export/
+          if-no-files-found: error
+          retention-days: 1
