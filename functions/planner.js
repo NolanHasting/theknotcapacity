@@ -7,7 +7,6 @@ const {getMessaging}=require('firebase-admin/messaging');
 const {logger}=require('firebase-functions');
 const crypto=require('node:crypto');
 const P=require('./planner-logic');
-const TZ=P.local;
 const REGION='us-east1',SERVICE='theknotcapacity@appspot.gserviceaccount.com';
 const db=getFirestore(),users=db.collection('plannerUsers'),codes=db.collection('plannerCodes');
 const profileRef=uid=>users.doc(uid);
@@ -74,6 +73,28 @@ async function postPlanner(req,res){
  const u=await verified(req),profile=await ensureProfile(u),body=req.body||{},action=body.action;
  if(typeof action!=='string'||JSON.stringify(body).length>12000)bad(400,'Invalid request');
  const ref=profileRef(u.uid);
+ if(action==='account.delete'){
+  // Only a recent login can destroy private account data.
+  const authAge=Date.now()-(Number(u.auth_time)||0)*1000;
+  if(!Number.isFinite(authAge)||authAge>10*60*1000)bad(403,'Sign out and sign back in before deleting your account.');
+  const [plans,push,requests]=await Promise.all([
+   ref.collection('plans').limit(100).get(),
+   ref.collection('pushTokens').limit(100).get(),
+   ref.collection('requests').limit(100).get()
+  ]);
+  const batch=db.batch();
+  for(const doc of [...plans.docs,...push.docs,...requests.docs])batch.delete(doc.ref);
+  for(const friendId of (profile.friends||[])){
+   const other=profileRef(friendId);
+   batch.update(other,{friends:FieldValue.arrayRemove(u.uid)});
+   batch.delete(other.collection('requests').doc(u.uid));
+  }
+  batch.delete(codes.doc(profile.friendCode));
+  batch.delete(ref);
+  await batch.commit();
+  await getAuth().deleteUser(u.uid);
+  res.json({ok:true});return;
+ }
  if(action==='profile.save'){
   const displayName=safeName(body.displayName);
   if(displayName.length<2)bad(400,'Enter a name with at least two characters');
@@ -205,7 +226,10 @@ exports.evaluatePlannerAlerts=onSchedule({schedule:'*/5 * * * *',timeZone:'Ameri
     for(const tokenDoc of tokens.docs){
      try{
       await getMessaging().send({token:tokenDoc.data().token,
-       data:{title:message.title,body:message.body,url:'/planner.html'}});
+       notification:{title:message.title,body:message.body},
+       webpush:{notification:{title:message.title,body:message.body,
+        icon:'/logo.png',badge:'/logo.png',tag:'knot-crowd-alert'},
+        fcmOptions:{link:'https://theknotcapacity.web.app/planner.html'}}});
      }catch(e){
       logger.warn('Push delivery failed',{uid:doc.id,code:e.code});
       if(['messaging/registration-token-not-registered','messaging/invalid-registration-token'].includes(e.code))
