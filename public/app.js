@@ -43,8 +43,10 @@ function dayChart(d){
   const line=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
   const upper=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.high).toFixed(2)).join(' ');
   const lower=projected.slice().reverse().map(p=>'L'+x(p.ts).toFixed(2)+' '+y(p.low).toFixed(2)).join(' ');
-  shapes+=`<path d="${upper} ${lower} Z" fill="#fff" opacity=".15"/>`;
-  shapes+=`<path d="${line}" fill="none" stroke="#fff" stroke-width="2.6" stroke-dasharray="7 5"/>`;
+  shapes+=`<defs><linearGradient id="forecastBand" x1="0" x2="1" y1="0" y2="0"><stop offset="0%" stop-color="#f0c468" stop-opacity=".08"/><stop offset="55%" stop-color="#f0c468" stop-opacity=".21"/><stop offset="100%" stop-color="#f0c468" stop-opacity=".3"/></linearGradient></defs>`;
+  shapes+=`<path d="${upper} ${lower} Z" fill="url(#forecastBand)" stroke="none"/>`;
+  shapes+=`<path d="${upper}" fill="none" stroke="#f0c468" stroke-opacity=".36" stroke-width="1" stroke-dasharray="3 5"/>`;
+  shapes+=`<path d="${line}" fill="none" stroke="#f0c468" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="7 5"/>`;
   const divider=x(nowTs);shapes+=svg('line',`x1="${divider.toFixed(2)}" y1="${top}" x2="${divider.toFixed(2)}" y2="${bottom}" stroke="#999" stroke-dasharray="3 6"`);
   shapes+=`<text x="${Math.min(right-7,divider+6).toFixed(2)}" y="13" fill="#fff" font-size="10" text-anchor="${divider>right-65?'end':'start'}">NOW</text>`;
  }
@@ -54,7 +56,7 @@ function dayChart(d){
  }
  $('dayChart').innerHTML=marks+shapes+ticks.join('');
  $('forecastType').textContent=forecast?'FORECAST':'REPORTED ONLY';
- $('dayNote').textContent=forecast?'Forecast starts from the estimated crowd when enough recounts are available. Zero at closing is assumed.':'Forecast unavailable while live data is offline.';
+ $('dayNote').textContent=forecast?'Forecast based on recent counts and past daily patterns. The shaded range is illustrative; zero at closing is assumed.':'Forecast unavailable while live data is offline.';
 }
 const HEAT_COLORS=[
  '#123f32','#196047','#257b4d','#40945b',
@@ -123,8 +125,9 @@ function render(d){
  $('fill').style.width=closed||state==='offline'||!Number.isFinite(d.percent)?'0%':Math.min(100,d.percent)+'%';$('fill').style.background=color;
  $('capacity').textContent=closed?'Outside gym hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 reference'+(d.count>100?' · above reference':''):'—';
  $('updated').textContent=d.sourceUpdated?'Last received '+time(d.sourceUpdated):'No reading received';
- $('estimatedNow').textContent=live&&Number.isFinite(d.estimatedNow)?d.estimatedNow:'—';
- $('estimateNote').textContent=live&&Number.isFinite(d.estimatedNow)?'Adjusted from likely recounts':'Not enough recounts yet';
+ const change=live?d.reportedChange30:null;
+ $('rate').textContent=change&&Number.isFinite(change.change)?(change.change>0?'+':'')+change.change:'—';
+ $('rateNote').textContent=change?'Reported count change':'Not enough recent data';
  $('usual').textContent=d.typicalNow==null?'—':d.typicalNow;
  $('usualNote').textContent=d.typicalDays>=2?d.typicalDays+' matching days':'Limited history';
  $('next').textContent=live&&d.forecast?d.forecast.projected:'—';
@@ -140,7 +143,7 @@ function errorState(message){
  $('connection').textContent='OFFLINE';$('liveDot').style.background='#ff6767';
  $('status').textContent='OFFLINE';$('status').style.color='#ff6767';$('count').textContent='—';
  $('open').textContent='DATA UNAVAILABLE';$('trend').textContent='—';$('fill').style.width='0%';
- $('estimatedNow').textContent='—';$('estimateNote').textContent='Unavailable';$('next').textContent='—';$('usual').textContent='—';$('bestQuick').textContent='—';$('bestQuickNote').textContent='Unavailable';$('usualNote').textContent='—';$('nextNote').textContent='Unavailable';
+ $('rate').textContent='—';$('rateNote').textContent='Unavailable';$('next').textContent='—';$('usual').textContent='—';$('bestQuick').textContent='—';$('bestQuickNote').textContent='Unavailable';$('usualNote').textContent='—';$('nextNote').textContent='Unavailable';
  $('updated').textContent='—';$('capacity').textContent='—';
  $('insight').textContent='Current occupancy is unavailable.';
  $('insightDetails').innerHTML='';
