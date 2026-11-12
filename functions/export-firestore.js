@@ -38,7 +38,7 @@ async function main(){
  const uniqueDates=new Set(valid.map(r=>r.date));
  const counts=valid.map(r=>r.count);
  const summary={
-  exportedAt,projectId:db.app.options.projectId,
+  exportedAt,projectId:process.env.GCLOUD_PROJECT || 'theknotcapacity',
   dayDocuments:days.length,readings:rows.length,validReadings:valid.length,invalidReadings:rows.length-valid.length,
   uniqueDates:uniqueDates.size,firstReading:valid[0]?.timestamp || null,lastReading:valid[valid.length-1]?.timestamp || null,
   minimum:counts.length?counts.reduce((m,n)=>Math.min(m,n),Infinity):null,
