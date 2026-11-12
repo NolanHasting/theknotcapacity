@@ -28,9 +28,5 @@ jobs:
           node --check functions/history.js
           node --check functions/analytics.js
           node --check functions/recounts.js
-          node --check functions/planner-logic.js
-          node --check functions/planner.js
-          node --input-type=module --check < public/planner.js
-          node --check public/firebase-messaging-sw.js
           node --check public/app.js
           node --check public/history.js
