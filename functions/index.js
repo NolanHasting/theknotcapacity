@@ -69,7 +69,11 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
    const frozen=A.snapshot(p.day,now,count,projection);
    if(frozen)tx.set(db.collection('forecastSnapshots').doc(minuteId),frozen);
   }
-  if(correction.event)tx.set(db.collection('recountEvents').doc(minuteId),correction.event);
+  if(correction.event){
+   // Stable episode ID: subsequent downward steps replace the same event.
+   const id=p.day+'_'+Date.parse(correction.event.startTimestamp);
+   tx.set(db.collection('recountEvents').doc(id),correction.event);
+  }
   tx.set(WEEKLY,{...nextWeekly,total:(weekly.total||0)+1});
   tx.set(STATUS,status);
  });
@@ -87,6 +91,7 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   const status=s.data(),weekly=w.exists?w.data():{};
   let response=L.summarize(status,d.exists?d.data():{},weekly);
   response.forecastAccuracy=a.exists?a.data():null;
+  response.recounts=R.groupDrops(response.todayHistory||[]);
   const age=(Date.now()-Date.parse(status.sourceUpdated||''))/60000;
   // Display a warning if source readings are old. Never silently claim LIVE.
   response.sourceAgeMinutes=Number.isFinite(age)?Math.round(age):null;

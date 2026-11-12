@@ -132,11 +132,11 @@ const small=R.update({}, {timestamp:'2026-11-10T20:00:00Z',count:61},60,
  new Date('2026-11-10T20:01:00Z'));
 assert.equal(small.isReset,true);
 assert.equal(small.isStrongReset,false);
-assert.equal(small.event.classification,'small_decrease');
+assert.equal(small.event.classification,'staff_recount');
 assert.equal(small.event.verified,false);
 const big=R.update({}, {timestamp:'2026-11-10T20:00:00Z',count:61},40,
  new Date('2026-11-10T20:01:00Z'));
-assert.equal(big.event.classification,'likely_recount');
+assert.equal(big.event.classification,'staff_recount');
 assert.equal(R.update({}, {timestamp:'2026-11-10T20:00:00Z',count:61},62,
  new Date('2026-11-10T20:01:00Z')).event,null);
 const A=require('../functions/analytics');
@@ -161,4 +161,28 @@ assert.equal(metrics.horizons[15].persistenceMAE,10);
 assert.equal(metrics.horizons[30].candidateRecountSamples,1);
 const summarized=H.future('2026-11-17',[{date:'2026-11-10',bins:[{minute:600,count:35,samples:15},{minute:615,count:50,samples:15}]}]);
 assert.equal(summarized.points.find(p=>p.minute===600).count,40);
+
+const multiStep=[
+ {timestamp:'2026-11-10T15:00:00Z',count:112},
+ {timestamp:'2026-11-10T15:01:00Z',count:96},
+ {timestamp:'2026-11-10T15:03:00Z',count:96},
+ {timestamp:'2026-11-10T15:05:00Z',count:78},
+ {timestamp:'2026-11-10T15:07:00Z',count:78},
+ {timestamp:'2026-11-10T15:09:00Z',count:80},
+ {timestamp:'2026-11-10T15:16:00Z',count:74},
+ {timestamp:'2026-11-10T15:17:00Z',count:74}
+];
+const grouped=R.groupDrops(multiStep);
+assert.equal(grouped.length,2,'Multiple downward steps in one recount must get one marker');
+assert.equal(grouped[0].timestamp,'2026-11-10T15:05:00Z');
+assert.equal(grouped[0].count,78);
+assert.equal(grouped[0].drop,34);
+assert.equal(grouped[0].steps,2);
+assert.equal(grouped[1].count,74);
+const processed=R.inspect(multiStep);
+assert.equal(processed.events.length,2);
+assert.equal(processed.state.resetCount,2);
+const gap=[{timestamp:'2026-11-10T15:00:00Z',count:100},{timestamp:'2026-11-10T15:09:00Z',count:75}];
+assert.equal(R.groupDrops(gap).length,1,'Source polling can miss intermediate minutes');
+assert.equal(R.groupDrops([{timestamp:'2026-11-10T15:00:00Z',count:100},{timestamp:'2026-11-10T15:15:00Z',count:75}]).length,1,'All observed declines get a recount marker, including polling gaps');
 console.log('All backend logic tests passed.');

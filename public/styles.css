@@ -58,7 +58,7 @@ footer{margin-top:27px;border-top:1px solid var(--line);padding-top:18px;display
 .insight-item small{display:block;color:var(--muted);font-size:11px}
 @media(max-width:670px){.insight-grid{grid-template-columns:1fr}.insight-item{padding:12px}}
 
-.legend i.recount{width:10px;height:10px;border-radius:50%;background:#7dc7e6}
+.legend i.recount{width:10px;height:10px;border-radius:2px;background:#9FD39B;transform:rotate(45deg);margin:0 3px}
 
 .date-shortcuts{display:flex;gap:7px;margin-top:8px}
 .date-shortcuts .refresh{padding:6px 11px}
