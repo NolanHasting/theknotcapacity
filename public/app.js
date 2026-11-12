@@ -10,7 +10,7 @@ function dayChart(d){
  const history=(d.todayHistory||[]).filter(p=>Number.isFinite(p.count)&&Number.isFinite(Date.parse(p.timestamp))).sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
  const forecast=d.dataState==='live'?d.forecast:null;
  const points=(forecast&&forecast.points)||[];
- if(!history.length){clearChart('Waiting for today’s observed readings…');$('dayNote').textContent='No readings logged today.';return;}
+ if(!history.length){clearChart('No counts yet today');$('dayNote').textContent='No counts yet today.';return;}
  // The first recorded point determines the graph's left edge; all time spacing is real.
  const start=Date.parse(history[0].timestamp),nowTs=Date.parse(d.sourceUpdated||d.updated);
  const lastTs=Date.parse(history[history.length-1].timestamp);
@@ -41,8 +41,8 @@ function dayChart(d){
   ticks.push(`<text x="${(left+(right-left)*i/4).toFixed(1)}" y="232" fill="#bfbfbf" font-size="10" text-anchor="${i===0?'start':i===4?'end':'middle'}">${esc(time(new Date(ts).toISOString()))}</text>`);
  }
  $('dayChart').innerHTML=marks+shapes+ticks.join('');
- $('forecastType').textContent=forecast?forecast.confidence+' ESTIMATE':'OBSERVED ONLY';
- $('dayNote').textContent=history.length+' readings today'+(forecast?' · assumed empty at configured closing time · forecast is exploratory with an illustrative, uncalibrated spread.':' · forecast unavailable until live data is restored.');
+ $('forecastType').textContent=forecast?'FORECAST':'REPORTED ONLY';
+ $('dayNote').textContent=forecast?'Forecast starts from the estimated crowd when enough recounts are available. Zero at closing is assumed.':'Forecast unavailable while live data is offline.';
 }
 const HEAT_COLORS=[
  '#123f32','#196047','#257b4d','#40945b',
@@ -71,8 +71,27 @@ function renderHeat(cells){
  $('heatmap').innerHTML=html;
 }
 function renderBest(items){
- $('besttimes').innerHTML=items&&items.length?items.map(v=>'<div class="bestitem"><div class="eyebrow">'+esc(v.day)+' · '+esc(hourLabel(v.hour))+'</div><strong>'+v.average+' <small>typical people</small></strong><small>'+v.days+' separate day'+(v.days===1?'':'s')+' · '+v.samples+' readings</small><small class="reliability">'+(v.provisional?'Very early estimate':'Developing pattern')+'</small></div>').join(''):
- '<div class="fine">No reliable upcoming historical slots yet. As additional days are recorded, quieter windows for the rest of today will appear here.</div>';
+ const options=(items||[]).filter(x=>Number.isFinite(x.average));
+ $('besttimes').innerHTML=options.length?options.map(v=>'<div class="bestitem"><div class="eyebrow">'+esc(v.day)+' · '+esc(hourLabel(v.hour))+'</div><strong>'+v.average+' <small>avg. reported</small></strong><small>Based on '+v.days+' day'+(v.days===1?'':'s')+'</small><small class="reliability">'+(v.days>=3?'Some history':'Limited history')+'</small></div>').join(''):
+ '<div class="fine">No comparable upcoming hours yet. Check back as more days are recorded.</div>';
+ const top=options[0];
+ $('bestQuick').textContent=top?hourLabel(top.hour).replace(':00',''):'—';
+ $('bestQuickNote').textContent=top?top.average+' avg. reported · '+top.days+' day'+(top.days===1?'':'s'):'Not enough history yet';
+}
+function insightDetails(d,live){
+ const items=[];
+ if(live&&Number.isFinite(d.count)){
+  if(Number.isFinite(d.typicalNow)&&d.typicalDays>=2){
+   const difference=d.count-d.typicalNow;
+   items.push({title:'COMPARED WITH USUAL',value:(difference>0?'+':'')+difference+' people',detail:difference>5?'Busier than usual':difference< -5?'Quieter than usual':'About normal'});
+  }else items.push({title:'COMPARED WITH USUAL',value:'—',detail:'Need more matching weekdays'});
+  if(Number.isFinite(d.estimatedNow)){
+   items.push({title:'ADJUSTED ESTIMATE',value:d.estimatedNow+' people',detail:'Based on likely recounts · approximate'});
+  }else items.push({title:'ADJUSTED ESTIMATE',value:'—',detail:'Not enough likely recounts yet'});
+  const best=(d.bestTimes||[])[0];
+  if(best)items.push({title:'QUIETER LATER',value:hourLabel(best.hour),detail:best.average+' average reported · '+best.days+' matching day'+(best.days===1?'':'s')});
+ }else items.push({title:'CURRENT STATUS',value:(d.dataState||'offline').toUpperCase(),detail:'Live comparisons unavailable'});
+ $('insightDetails').innerHTML=items.map(x=>'<div class="insight-item"><div class="eyebrow">'+esc(x.title)+'</div><strong>'+esc(x.value)+'</strong><small>'+esc(x.detail)+'</small></div>').join('');
 }
 function render(d){
  lastData=d;
@@ -87,14 +106,16 @@ function render(d){
  $('fill').style.width=closed||state==='offline'||!Number.isFinite(d.percent)?'0%':Math.min(100,d.percent)+'%';$('fill').style.background=color;
  $('capacity').textContent=closed?'Outside configured hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 max capacity'+(d.count>100?' · above policy limit':''):'—';
  $('updated').textContent=d.sourceUpdated?'Last received '+time(d.sourceUpdated):'No reading received';
- $('rate').textContent=live&&Number.isFinite(d.trendPer30)?(d.trendPer30>0?'+':'')+Math.round(d.trendPer30):'—';
+ $('estimatedNow').textContent=live&&Number.isFinite(d.estimatedNow)?d.estimatedNow:'—';
+ $('estimateNote').textContent=live&&Number.isFinite(d.estimatedNow)?'Adjusted from likely recounts':'Not enough recounts yet';
  $('usual').textContent=d.typicalNow==null?'—':d.typicalNow;
  $('usualNote').textContent=(d.typicalDays||0)+' matching days';
  $('next').textContent=live&&d.forecast?d.forecast.projected:'—';
  $('nextNote').textContent=live&&d.forecast?'exploratory · '+Math.min(60,d.forecast.horizonMinutes)+' min ahead':'not available';
- $('points').textContent=d.dataPoints||0;$('coverage').textContent=d.note||'historical readings';
- $('insight').textContent=(d.warning?d.warning+' ':'')+(d.insight||'')+(live&&d.forecast?' Projections use short-term movement and developing weekday averages; abrupt source corrections may occur. Closing-time zero is an assumption, not a measured count.':'');
- $('logged').textContent='Last logged reading: '+time(d.lastLogged);
+ 
+ $('insight').textContent=d.warning||(!live?'Current crowd data is unavailable.':d.estimatedNow!=null?'The adjusted estimate accounts for possible staff recounts. The reported count remains unchanged.':'The displayed count comes directly from the gym. Crowd estimates will improve as more likely recounts are recorded.');
+ insightDetails(d,live);
+ $('logged').textContent='Updated '+time(d.lastLogged);
  dayChart(d);renderHeat(d.heatmap);renderBest(d.bestTimes);
 }
 function errorState(message){
@@ -102,10 +123,11 @@ function errorState(message){
  $('connection').textContent='OFFLINE';$('liveDot').style.background='#ff6767';
  $('status').textContent='OFFLINE';$('status').style.color='#ff6767';$('count').textContent='—';
  $('open').textContent='DATA UNAVAILABLE';$('trend').textContent='—';$('fill').style.width='0%';
- $('rate').textContent='—';$('next').textContent='—';$('usual').textContent='—';$('points').textContent='—';$('coverage').textContent='Unable to verify dataset';$('usualNote').textContent='—';$('nextNote').textContent='Unavailable';
+ $('estimatedNow').textContent='—';$('estimateNote').textContent='Unavailable';$('next').textContent='—';$('usual').textContent='—';$('bestQuick').textContent='—';$('bestQuickNote').textContent='Unavailable';$('usualNote').textContent='—';$('nextNote').textContent='Unavailable';
  $('updated').textContent='—';$('capacity').textContent='—';
- $('insight').textContent='Unable to retrieve occupancy data: '+message+' · The live backend may need deployment. Check the Firebase Cloud Functions deployment and scheduled collector logs.';
- $('dayNote').textContent='Data unavailable.';clearChart('Unable to load readings.');
+ $('insight').textContent='Current occupancy is unavailable.';
+ $('insightDetails').innerHTML='';
+ $('dayNote').textContent='Data unavailable.';clearChart('Unable to load counts.');
  $('besttimes').innerHTML='<div class="fine">No current recommendations.</div>';
  $('heatmap').innerHTML='';
 }
