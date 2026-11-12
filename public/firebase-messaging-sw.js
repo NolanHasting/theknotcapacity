@@ -4,6 +4,7 @@ importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-comp
 importScripts('/__/firebase/init.js');
 const messaging=firebase.messaging();
 messaging.onBackgroundMessage(payload=>{
+ if(payload.notification)return; // Browser displays notification payload automatically.
  const data=payload.data||{};
  if(!data.title)return;
  self.registration.showNotification(data.title,{
