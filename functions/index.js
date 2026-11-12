@@ -176,7 +176,3 @@ exports.scoreOccupancyForecasts=onSchedule({schedule:'15 2 * * *',timeZone:L.TZ,
  await batch.commit();
  logger.info('Scored daily forecasts',{date,snapshots:snapshots.length,observations:points.length});
 });
-
-// Separate private planner API, notification scheduler, and public event importer.
-// These do not alter the existing occupancy collection endpoint.
-Object.assign(exports,require('./planner'));
