@@ -103,4 +103,25 @@ assert.equal(inspected.state.resetCount,2);
 const enhanced=H.future('2026-11-17',historyRecords);
 assert.ok(enhanced.points.every(p=>p.count===null||(p.low<=p.count&&p.high>=p.count)));
 assert.deepEqual(enhanced.points.at(-1),{minute:1380,count:0,low:0,high:0,days:0,assumedClose:true});
+
+const nowReading=new Date('2026-11-10T18:30:00Z');
+const samples=[
+ {timestamp:'2026-11-10T18:00:00Z',count:54},
+ {timestamp:'2026-11-10T18:30:00Z',count:68}
+];
+assert.equal(L.reportedChange30(samples,nowReading).change,14);
+assert.equal(L.reportedChange30([samples[1]],nowReading),null);
+assert.equal(L.reportedChange30(samples,new Date('2026-11-10T19:30:00Z')),null);
+const profileWeek={};
+const pointA={day:'2026-11-10',dow:2,hour:10,minute:10};
+const pointB={day:'2026-11-10',dow:2,hour:16,minute:10};
+let shapeWeek=profileWeek;
+shapeWeek=L.addWeekly(shapeWeek,pointA,15);
+shapeWeek=L.addWeekly(shapeWeek,pointB,95);
+const shapeForecast=L.forecast(40,0,shapeWeek,date);
+const mid=shapeForecast.points.find(p=>p.minutes===360);
+assert.ok(mid&&mid.count>40,'Afternoon forecast should rise when the recorded daily curve rises');
+assert.equal(shapeForecast.points[0].low,shapeForecast.points[0].high);
+assert.ok(shapeForecast.points[2].high-shapeForecast.points[2].low<shapeForecast.points[9].high-shapeForecast.points[9].low);
+assert.equal(shapeForecast.points.at(-1).count,0);
 console.log('All backend logic tests passed.');
