@@ -87,16 +87,37 @@ function heatmap(weekly){
  }
  return cells;
 }
-function best(weekly,now=new Date()){
+function best(weekly,now=new Date(),liveForecast=null,forecastTimestamp=null){
  const date=now instanceof Date?now:new Date(now),p=parts(date),minNow=p.hour*60+p.minute;
  const options=[];
+ // Prefer today's live forecast over historical hourly averages when available.
+ // Ignore the closing hour: the forced closing taper is not a useful climbing slot.
+ if(liveForecast&&Array.isArray(liveForecast.points)&&Number.isFinite(Date.parse(forecastTimestamp))){
+  const hourGroups=new Map(),closing=HOURS[p.dow][1];
+  for(const point of liveForecast.points){
+   if(!Number.isFinite(point.count)||!Number.isFinite(point.minutes)||point.minutes===0)continue;
+   const at=parts(new Date(Date.parse(forecastTimestamp)+point.minutes*60000));
+   if(at.day!==p.day||at.hour<Math.ceil(minNow/60)||at.hour>=closing-1)continue;
+   const group=hourGroups.get(at.hour)||[];
+   group.push(point.count);hourGroups.set(at.hour,group);
+  }
+  for(const [hour,values] of hourGroups){
+   if(values.length<2)continue;
+   const historical=typical(weekly,{dow:p.dow,hour});
+   options.push({day:DAYS[p.dow],dayIndex:p.dow,hour,
+    average:Math.round(values.reduce((a,b)=>a+b,0)/values.length),
+    historicalAverage:historical.average,samples:values.length,days:historical.days,
+    source:'forecast',provisional:true,reliability:'EARLY'});
+  }
+  if(options.length)return options.sort((a,b)=>a.average-b.average||a.hour-b.hour).slice(0,4);
+ }
  // Only suggest future hours TODAY (not closed hours, not past slots).
  for(let h=Math.max(HOURS[p.dow][0],Math.ceil(minNow/60));h<HOURS[p.dow][1];h++){
   const t=typical(weekly,{dow:p.dow,hour:h});
   // Avoid declaring an hour 'quiet' based on only a handful of minutes.
   if(t.average===null||t.samples<10)continue;
   options.push({day:DAYS[p.dow],dayIndex:p.dow,hour:h,average:t.average,samples:t.samples,days:t.days,
-   reliability:t.days>=3?'DEVELOPING':'LIMITED',provisional:t.days<3});
+   source:'history',reliability:t.days>=3?'DEVELOPING':'LIMITED',provisional:t.days<3});
  }
  return options.sort((a,b)=>a.average-b.average||a.hour-b.hour).slice(0,4);
 }
