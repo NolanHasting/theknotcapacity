@@ -135,7 +135,9 @@ function render(d){
  $('status').textContent=closed?'CLOSED':live?d.label:delayed?'DELAYED':'OFFLINE';
  $('status').style.color=live?color:delayed?'#ffc65c':'#ff6767';
  $('open').textContent=closed?'CLOSED HOURS':live?'OPEN NOW':delayed?'LAST KNOWN COUNT':'DATA UNAVAILABLE';
- $('trend').textContent=live?(d.trendLabel||'LEARNING'):'—';$('trend').style.color=live?'#fff':'#aaa';
+ const movement=live?(d.trend==='rising'?['↑','Filling Up']:d.trend==='falling'?['↓','Decreasing']:['→','Steady']):null;
+ $('trend').textContent=movement?movement[0]+' '+movement[1]:'—';
+ $('trend').style.color=live?'#fff':'#aaa';
  $('fill').style.width=closed||state==='offline'||!Number.isFinite(d.percent)?'0%':Math.min(100,d.percent)+'%';$('fill').style.background=color;
  $('capacity').textContent=closed?'Outside gym hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 reference'+(d.count>100?' · above reference':''):'—';
  $('updated').textContent=d.sourceUpdated?'Last received '+time(d.sourceUpdated):'No reading received';
