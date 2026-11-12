@@ -59,3 +59,11 @@ footer{margin-top:27px;border-top:1px solid var(--line);padding-top:18px;display
 @media(max-width:670px){.insight-grid{grid-template-columns:1fr}.insight-item{padding:12px}}
 
 .legend i.recount{width:10px;height:10px;border-radius:50%;background:#7dc7e6}
+
+.date-shortcuts{display:flex;gap:7px;margin-top:8px}
+.date-shortcuts .refresh{padding:6px 11px}
+.graph-selection{min-height:24px;margin-top:8px;color:#f0c468;font-size:12px;font-variant-numeric:tabular-nums}
+.chart-point{cursor:crosshair}
+.chart-point:focus-visible{stroke:#f0c468;stroke-width:2;fill:rgba(240,196,104,.18);outline:none}
+.heat .cell{cursor:help}
+@media(max-width:500px){.date-shortcuts{margin-top:10px}.history-toolbar{gap:10px}}
