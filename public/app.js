@@ -33,12 +33,6 @@ function dayChart(d){
    shapes+=`<circle cx="${x(Date.parse(cur.timestamp)).toFixed(2)}" cy="${y(cur.count).toFixed(2)}" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Possible staff recount</title></circle>`;
   }
  }
- if(d.dataState==='live'&&Number.isFinite(d.estimatedNow)&&Number.isFinite(nowTs)){
-  const src=history[history.length-1]?.count;
-  const xx=x(nowTs).toFixed(2),yy=y(d.estimatedNow).toFixed(2);
-  if(Number.isFinite(src))shapes+=`<line x1="${xx}" x2="${xx}" y1="${y(src).toFixed(2)}" y2="${yy}" stroke="#7dc7e6" stroke-dasharray="2 4" opacity=".75"/>`;
-  shapes+=`<circle cx="${xx}" cy="${yy}" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Estimated current crowd: ${Math.round(d.estimatedNow)}</title></circle>`;
- }
  if(projected.length>1){
   const line=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
   const upper=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.high).toFixed(2)).join(' ');
@@ -54,9 +48,20 @@ function dayChart(d){
   const ts=start+span*i/4;
   ticks.push(`<text x="${(left+(right-left)*i/4).toFixed(1)}" y="232" fill="#bfbfbf" font-size="10" text-anchor="${i===0?'start':i===4?'end':'middle'}">${esc(time(new Date(ts).toISOString()))}</text>`);
  }
- $('dayChart').innerHTML=marks+shapes+ticks.join('');
+ // Invisible touch targets keep the chart visually clean, but accessible.
+ const markers=[];
+ for(let i=0;i<history.length;i+=Math.max(1,Math.ceil(history.length/110))){
+  const p=history[i],label=time(p.timestamp)+': '+p.count+' reported';
+  markers.push('<circle class="chart-point" cx="'+x(Date.parse(p.timestamp)).toFixed(2)+'" cy="'+y(p.count).toFixed(2)+'" r="5" fill="transparent" tabindex="0" role="button" data-info="'+esc(label)+'"/>');
+ }
+ for(const p of projected){
+  if(!Number.isFinite(p.count))continue;
+  const label=time(new Date(p.ts).toISOString())+': '+p.count+' forecast · possible '+p.low+'–'+p.high;
+  markers.push('<circle class="chart-point" cx="'+x(p.ts).toFixed(2)+'" cy="'+y(p.count).toFixed(2)+'" r="5.5" fill="transparent" tabindex="0" role="button" data-info="'+esc(label)+'"/>');
+ }
+ $('dayChart').innerHTML=marks+shapes+markers.join('')+ticks.join('');
  $('forecastType').textContent=forecast?'FORECAST':'REPORTED ONLY';
- $('dayNote').textContent=forecast?'Forecast based on recent counts and past daily patterns. The shaded range is illustrative; zero at closing is assumed.':'Forecast unavailable while live data is offline.';
+ $('dayNote').textContent=forecast?'Forecast based on recent counts and past patterns. Range is illustrative; zero at close is assumed.':'Forecast unavailable without live readings.';
 }
 const HEAT_COLORS=[
  '#123f32','#196047','#257b4d','#40945b',
@@ -104,9 +109,12 @@ function insightDetails(d,live){
    const difference=d.count-d.typicalNow;
    items.push({title:'COMPARED WITH USUAL',value:(difference>0?'+':'')+difference+' people',detail:difference>5?'Busier than usual':difference< -5?'Quieter than usual':'About normal'});
   }else items.push({title:'COMPARED WITH USUAL',value:'—',detail:'Need more matching weekdays'});
-  if(Number.isFinite(d.estimatedNow)){
-   items.push({title:'ADJUSTED ESTIMATE',value:d.estimatedNow+' people',detail:'Based on likely recounts · approximate'});
-  }else items.push({title:'ADJUSTED ESTIMATE',value:'—',detail:'Not enough likely recounts yet'});
+  const accuracy=d.forecastAccuracy?.horizons?.[30];
+  if(accuracy&&accuracy.samples>=20&&Number.isFinite(accuracy.sourceMAE)){
+   items.push({title:'30-MIN FORECAST ERROR',value:'±'+Math.round(accuracy.sourceMAE),detail:'Mean error vs. reported counts · '+accuracy.samples+' checks on '+d.forecastAccuracy.date});
+  }else{
+   items.push({title:'FORECAST TRACK RECORD',value:'Collecting',detail:'Scoring forecasts against later counts'});
+  }
   const best=(d.bestTimes||[])[0];
   if(best)items.push({title:'QUIETER LATER',value:hourLabel(best.hour),detail:(best.source==='forecast'?'Forecast: ':'Past average: ')+best.average+' people · '+(best.days>=2?best.days+' matching days':'Limited history')});
  }else items.push({title:'CURRENT STATUS',value:(d.dataState||'offline').toUpperCase(),detail:'Live comparisons unavailable'});
@@ -121,7 +129,9 @@ function render(d){
  $('status').textContent=closed?'CLOSED':live?d.label:delayed?'DELAYED':'OFFLINE';
  $('status').style.color=live?color:delayed?'#ffc65c':'#ff6767';
  $('open').textContent=closed?'CLOSED HOURS':live?'OPEN NOW':delayed?'LAST KNOWN COUNT':'DATA UNAVAILABLE';
- $('trend').textContent=live?(d.trendLabel||'LEARNING'):'—';$('trend').style.color=live?'#fff':'#aaa';
+ const movement=live?(d.trend==='rising'?['↑','Filling Up']:d.trend==='falling'?['↓','Decreasing']:['→','Steady']):null;
+ $('trend').textContent=movement?movement[0]+' '+movement[1]:'—';
+ $('trend').style.color=live?'#fff':'#aaa';
  $('fill').style.width=closed||state==='offline'||!Number.isFinite(d.percent)?'0%':Math.min(100,d.percent)+'%';$('fill').style.background=color;
  $('capacity').textContent=closed?'Outside gym hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 reference'+(d.count>100?' · above reference':''):'—';
  $('updated').textContent=d.sourceUpdated?'Last received '+time(d.sourceUpdated):'No reading received';
@@ -133,7 +143,7 @@ function render(d){
  $('next').textContent=live&&d.forecast?d.forecast.projected:'—';
  $('nextNote').textContent=live&&d.forecast?'Estimated in '+Math.min(60,d.forecast.horizonMinutes)+' min':'Not available';
  
- $('insight').textContent=d.warning||(!live?'Current crowd data is unavailable.':d.estimatedNow!=null?'The adjusted estimate accounts for possible staff recounts. The reported count remains unchanged.':'The displayed count comes directly from the gym. Crowd estimates will improve as more likely recounts are recorded.');
+ $('insight').textContent=d.warning||(!live?'Current crowd data is unavailable.':'The main number is reported by The Knot. Drops may be staff recounts; future counts are estimates.');
  insightDetails(d,live);
  $('logged').textContent='Updated '+time(d.lastLogged);
  dayChart(d);renderHeat(d.heatmap);renderBest(d.bestTimes);
@@ -169,3 +179,10 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 refresh();setInterval(refresh,30000);
+
+function showChartPoint(e){
+ const point=e.target.closest?.('[data-info]');
+ if(point)$('daySelection').textContent=point.getAttribute('data-info');
+}
+$('dayChart').addEventListener('click',showChartPoint);
+$('dayChart').addEventListener('focusin',showChartPoint);

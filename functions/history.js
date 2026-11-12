@@ -32,21 +32,27 @@ function historical(doc,date){
   note:'Source readings. Large drops may reflect staff recounts.'};
 }
 function weekdayOf(date){return L.parts(new Date(date+'T12:00:00Z')).dow;}
+function samples(bin){return Math.max(1,bin.samples||1);}
 function future(date,records){
  const dow=weekdayOf(date),range=L.HOURS[dow],other=Array.isArray(records)?records:[];
- const valid=other.filter(r=>dateOnly(r.date)&&r.date<date&&Array.isArray(r.points)&&r.points.length);
+ const valid=other.filter(r=>dateOnly(r.date)&&r.date<date&&((Array.isArray(r.points)&&r.points.length)||(Array.isArray(r.bins)&&r.bins.length)));
  const same=valid.filter(r=>weekdayOf(r.date)===dow);
  const baseline=same.length>=2?same:valid;
  const basis=same.length>=2?'same weekdays':'recent days';
  // Reconstruct departure rates from successive probable recounts, then adjust
  // historical readings downward between anchor points. If evidence is too
  // sparse, leave the raw readings intact and identify them as source-based.
- const all=valid.flatMap(d=>d.points.map(p=>({...p})));
+ const all=valid.flatMap(d=>(d.points||[]).map(p=>({...p})));
+ // Daily summary documents contain 15-minute averages, not minute observations.
  const analysis=R.inspect(all);
  const rate=Number.isFinite(analysis.state.departuresPerMinute)&&analysis.state.rateSamples>=2?
   analysis.state.departuresPerMinute:null;
  const resets=analysis.results.filter(v=>v.isReset).map(v=>Date.parse(v.timestamp));
  const daily=baseline.map(r=>{
+  if(Array.isArray(r.bins)&&r.bins.length){
+   return {date:r.date,bins:new Map(r.bins.filter(x=>Number.isFinite(x.minute)&&Number.isFinite(x.count))
+    .map(x=>[x.minute,{sum:x.count*samples(x),n:samples(x)}]))};
+  }
   let pointer=0,lastReset=null;
   const sorted=r.points.slice().sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
   const adjusted=rate===null?sorted:sorted.map(p=>{

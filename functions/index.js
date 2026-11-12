@@ -7,6 +7,7 @@ const {logger}=require('firebase-functions');
 const L=require('./logic');
 const H=require('./history');
 const R=require('./recounts');
+const A=require('./analytics');
 initializeApp();
 const db=getFirestore();
 const REGION='us-east1';
@@ -53,13 +54,22 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
   const nextWeekly=L.addWeekly(weekly,p,count);
   const projection=L.forecast(count,rate,nextWeekly,now,correction);
   const sample={timestamp:now.toISOString(),count};
-  const status={...L.crowd(count,true),open:true,count,trend:direction.key,trendLabel:direction.label,
+  const status={...L.crowd(count,true),open:true,count,trend:direction.key,trendLabel:direction.label,trendArrow:direction.arrow,
    trendPer30:rate,forecast:projection,updated:now.toISOString(),sourceUpdated:now.toISOString(),
    lastLogged:now.toISOString(),lastMinuteId:minuteId,recent:[...oldRecent,sample].slice(-50),
    recountModel:correction.state,estimatedNow:correction.estimatedNow,
    estimateBasis:correction.estimateBasis,estimateAgeMinutes:correction.estimateAgeMinutes,
-   isPossibleRecount:correction.isReset,error:null};
-  tx.set(dayRef,{date:p.day,points:[...(day.points||[]),sample],updated:now.toISOString()});
+   isPossibleRecount:correction.isReset,lastRecountCandidateAt:correction.event?now.toISOString():old.lastRecountCandidateAt||null,error:null};
+  const updatedPoints=[...(day.points||[]),sample];
+  tx.set(dayRef,{date:p.day,points:updatedPoints,updated:now.toISOString()});
+  // Store compact summaries and frozen predictions once per quarter-hour.
+  if(p.minute%15===0){
+   const summary=A.compactDay(p.day,updatedPoints);
+   tx.set(db.collection('dailySummaries').doc(p.day),summary);
+   const frozen=A.snapshot(p.day,now,count,projection);
+   if(frozen)tx.set(db.collection('forecastSnapshots').doc(minuteId),frozen);
+  }
+  if(correction.event)tx.set(db.collection('recountEvents').doc(minuteId),correction.event);
   tx.set(WEEKLY,{...nextWeekly,total:(weekly.total||0)+1});
   tx.set(STATUS,status);
  });
@@ -72,10 +82,11 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
  if(req.method!=='GET'){res.status(405).json({ok:false,error:'GET only'});return;}
  try{
   const p=L.parts(new Date());
-  const [s,d,w]=await Promise.all([STATUS.get(),db.collection('days').doc(p.day).get(),WEEKLY.get()]);
+  const [s,d,w,a]=await Promise.all([STATUS.get(),db.collection('days').doc(p.day).get(),WEEKLY.get(),db.collection('system').doc('forecastAccuracy').get()]);
   if(!s.exists){res.status(503).set('Cache-Control','no-store').json({ok:false,error:'No reading exists yet. Check that collectOccupancy is deployed, enabled, and running in Firebase Scheduler.'});return;}
   const status=s.data(),weekly=w.exists?w.data():{};
   let response=L.summarize(status,d.exists?d.data():{},weekly);
+  response.forecastAccuracy=a.exists?a.data():null;
   const age=(Date.now()-Date.parse(status.sourceUpdated||''))/60000;
   // Display a warning if source readings are old. Never silently claim LIVE.
   response.sourceAgeMinutes=Number.isFinite(age)?Math.round(age):null;
@@ -85,8 +96,13 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   response.lastSourceErrorAt=status.sourceErrorAt||null;
   response.sourceHealth=status.error?'fetch_failed':'ok';
   response.ok=true; // A delayed response is valid JSON: render its warning, not an API error.
+  // Normalize older persisted LEARNING states for widgets and the web client.
+  if(response.dataState==='live'){
+   const direction=L.trend(Number.isFinite(status.trendPer30)?status.trendPer30:null,true);
+   response.trend=direction.key;response.trendLabel=direction.label;response.trendArrow=direction.arrow;
+  }
   response.bestTimes=L.best(weekly,new Date(),response.dataState==='live'?status.forecast:null,status.sourceUpdated);
-  if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';}
+  if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';response.trendArrow=null;}
   if(response.dataState==='delayed')response.warning='Source reading delayed; last known count only.';
   if(response.dataState==='offline')response.warning='Source unavailable; last known count is not reliable.';
   if(status.error&&response.dataState!=='closed')response.warning=(response.warning||'')+' Last collection error: '+String(status.error).slice(0,160);
@@ -114,8 +130,13 @@ exports.getHistory=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
    response=H.historical(doc.exists?doc.data():{points:[]},date);
   }else{
    const lower=new Date(Date.parse(date+'T12:00:00Z')-60*86400000).toISOString().slice(0,10);
-   const snap=await db.collection('days').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
-   const records=snap.docs.map(d=>({...d.data(),date:d.id}));
+   const summaries=await db.collection('dailySummaries').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
+   let records=summaries.docs.map(d=>({...d.data(),date:d.id}));
+   // Transitional fallback while historical daily summaries are being built.
+   if(records.length<3){
+    const old=await db.collection('days').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
+    records=old.docs.map(d=>({...d.data(),date:d.id}));
+   }
    response=H.future(date,records);
   }
   res.json({ok:true,...response});
@@ -123,4 +144,30 @@ exports.getHistory=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   logger.error('getHistory failed',err);
   res.status(503).json({ok:false,error:'Unable to read historical observations right now.'});
  }
+});
+
+// Runs after midnight. Save out-of-sample scores without altering earlier forecasts.
+exports.scoreOccupancyForecasts=onSchedule({schedule:'15 2 * * *',timeZone:L.TZ,
+ region:REGION,memory:'256MiB',timeoutSeconds:90,maxInstances:1,serviceAccount:RUNTIME_SERVICE_ACCOUNT},async()=>{
+ const today=L.parts(new Date()).day;
+ const yesterday=new Date(today+'T12:00:00Z');
+ yesterday.setUTCDate(yesterday.getUTCDate()-1);
+ const date=yesterday.toISOString().slice(0,10);
+ const [raw,snaps,events]=await Promise.all([
+  db.collection('days').doc(date).get(),
+  db.collection('forecastSnapshots').where('date','==',date).get(),
+  db.collection('recountEvents').orderBy(FieldPath.documentId()).startAt(date+'_').endAt(date+'_\uf8ff').get()
+ ]);
+ // The event range above is UTC-based. A dated document prefix is more robust
+ // around DST and local-day boundaries; filter by local date as a safeguard.
+ const snapshots=snaps.docs.map(x=>x.data());
+ const recounts=events.docs.map(x=>x.data()).filter(x=>L.parts(new Date(x.timestamp)).day===date);
+ const points=raw.exists?raw.data().points||[]:[];
+ const scored=A.scoreDay(points,snapshots,recounts);
+ const updated=new Date().toISOString();
+ const batch=db.batch();
+ batch.set(db.collection('forecastScores').doc(date),{...scored,date,updated});
+ batch.set(db.collection('system').doc('forecastAccuracy'),{...scored,date,updated});
+ await batch.commit();
+ logger.info('Scored daily forecasts',{date,snapshots:snapshots.length,observations:points.length});
 });
