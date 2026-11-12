@@ -2,8 +2,14 @@
 // A decrement is evidence of a possible staff headcount; size determines strength.
 // Retain the original source reading. Never label these as verified headcounts.
 const clamp=(n,a,b)=>Math.min(b,Math.max(a,n));
+const L=require('./logic');
 function update(state={},previous,reading,now){
  const next={...state},oldTime=Date.parse(previous?.timestamp||'');
+ // A gym day starts a new recount sequence; keep learned departure rates but
+ // never mistake last night's count for today's staff reconciliation.
+ if(next.lastResetAt&&L.parts(new Date(next.lastResetAt)).day!==L.parts(now).day){
+  next.lastResetAt=null;next.lastStrongResetAt=null;
+ }
  const gap=(now.getTime()-oldTime)/60000;
  const drop=Number.isFinite(previous?.count)&&Number.isFinite(reading)?previous.count-reading:0;
  const isReset=drop>0&&Number.isFinite(gap)&&gap>0&&gap<=3;
@@ -15,7 +21,7 @@ function update(state={},previous,reading,now){
    verified:false};
   // One-count jitter shouldn't determine the learned departure rate.
   if(isStrongReset){
-   const last=Date.parse(state.lastStrongResetAt||'');
+   const last=Date.parse(next.lastStrongResetAt||'');
    const elapsed=(now.getTime()-last)/60000;
    if(Number.isFinite(elapsed)&&elapsed>=20&&elapsed<=240){
     const implied=clamp(drop/elapsed,0,2);
@@ -44,7 +50,7 @@ function inspect(points){
  let state={},previous=null;const results=[];
  for(const point of ordered){
   // Never roll a previous day's source count into a next-day recount.
-  if(previous && point.timestamp.slice(0,10)!==previous.timestamp.slice(0,10)){
+  if(previous && L.parts(new Date(point.timestamp)).day!==L.parts(new Date(previous.timestamp)).day){
    previous=null;state={...state,lastResetAt:null,lastStrongResetAt:null};
   }
   const result=update(state,previous,point.count,new Date(point.timestamp));
