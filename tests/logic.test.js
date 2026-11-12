@@ -8,7 +8,10 @@ assert.equal(L.crowd(75,false).label,'CLOSED');
 assert.equal(L.trend(5,true).key,'rising');
 assert.equal(L.trend(-5,true).key,'falling');
 assert.equal(L.trend(0,true).key,'steady');
-assert.equal(L.trend(null,true).key,'learning');
+assert.equal(L.trend(null,true).key,'steady');
+assert.equal(L.trend(null,true).arrow,'→');
+assert.equal(L.trend(5,true).arrow,'↑');
+assert.equal(L.trend(-5,true).arrow,'↓');
 const date=new Date('2026-11-10T15:30:00Z'); // Tue 10:30 AM Eastern
 assert.deepEqual(L.parts(date),{day:'2026-11-10',dow:2,hour:10,minute:30});
 assert.equal(L.openNow(L.parts(date)),true);
