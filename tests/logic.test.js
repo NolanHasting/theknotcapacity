@@ -184,5 +184,5 @@ assert.equal(processed.events.length,2);
 assert.equal(processed.state.resetCount,2);
 const gap=[{timestamp:'2026-11-10T15:00:00Z',count:100},{timestamp:'2026-11-10T15:09:00Z',count:75}];
 assert.equal(R.groupDrops(gap).length,1,'Source polling can miss intermediate minutes');
-assert.equal(R.groupDrops([{timestamp:'2026-11-10T15:00:00Z',count:100},{timestamp:'2026-11-10T15:15:00Z',count:75}]).length,0,'Extended missing data cannot prove a recount');
+assert.equal(R.groupDrops([{timestamp:'2026-11-10T15:00:00Z',count:100},{timestamp:'2026-11-10T15:15:00Z',count:75}]).length,1,'All observed declines get a recount marker, including polling gaps');
 console.log('All backend logic tests passed.');
