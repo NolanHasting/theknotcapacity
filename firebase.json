@@ -1,14 +1,62 @@
 {
- "functions":{"source":"functions","runtime":"nodejs22"},
- "firestore":{"rules":"firestore.rules"},
- "hosting":{
-  "public":"public",
-  "ignore":["firebase.json","**/.*","**/node_modules/**"],
-  "rewrites":[{"source":"/api/status","function":{"functionId":"getOccupancy","region":"us-east1"}}],
-  "headers":[
-   {"source":"/api/**","headers":[{"key":"Cache-Control","value":"no-store"}]},
-   {"source":"**/*.@(js|css|png)","headers":[{"key":"Cache-Control","value":"no-cache"}]},
-   {"source":"/index.html","headers":[{"key":"Cache-Control","value":"no-cache"}]}
-  ]
- }
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22"
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/history",
+        "function": {
+          "functionId": "getHistory",
+          "region": "us-east1"
+        }
+      },
+      {
+        "source": "/api/status",
+        "function": {
+          "functionId": "getOccupancy",
+          "region": "us-east1"
+        }
+      }
+    ],
+    "headers": [
+      {
+        "source": "/api/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(js|css|png)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ]
+  }
 }
