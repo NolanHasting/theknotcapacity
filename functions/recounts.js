@@ -1,7 +1,7 @@
 'use strict';
 const L=require('./logic');
 const clamp=(n,a,b)=>Math.min(b,Math.max(a,n));
-const MAX_SAMPLE_GAP=10; // minutes; source collection is sometimes irregular
+const MAX_SAMPLE_GAP=10; // minutes; maximum gap to join downward steps
 const MAX_PAUSE=6; // minutes between consecutive downward steps in one recount
 
 // One marked recount per downward episode. Flat readings can occur between
@@ -15,10 +15,10 @@ function groupDrops(points){
   const gap=previous?(time-Date.parse(previous.timestamp))/60000:Infinity;
   const day= L.parts(new Date(point.timestamp)).day;
   const sameDay=previous&&L.parts(new Date(previous.timestamp)).day===day;
-  const valid=gap>0&&gap<=MAX_SAMPLE_GAP&&sameDay;
+  const valid=gap>0&&sameDay;
   const declining=valid&&point.count<previous.count;
   if(declining){
-   const continuing=active&&(time-Date.parse(active.timestamp))/60000<=MAX_PAUSE&&previous.count<=active.count;
+   const continuing=active&&gap<=MAX_SAMPLE_GAP&&(time-Date.parse(active.timestamp))/60000<=MAX_PAUSE&&previous.count<=active.count;
    if(continuing){
     active.timestamp=point.timestamp;active.count=point.count;
     active.drop=active.previousCount-point.count;
@@ -45,11 +45,11 @@ function update(state={},previous,reading,now){
   next.lastResetAt=null;next.lastStrongResetAt=null;next.activeEpisode=null;
  }
  const drop=Number.isFinite(previous?.count)&&Number.isFinite(reading)?previous.count-reading:0;
- const isReset=drop>0&&gap>0&&gap<=MAX_SAMPLE_GAP&&sameDay;
+ const isReset=drop>0&&gap>0&&sameDay;
  let event=null,isStrongReset=false;
  if(isReset){
   const prior=next.activeEpisode;
-  const continuing=prior&&now.getTime()-Date.parse(prior.timestamp)<=MAX_PAUSE*60000&&
+  const continuing=prior&&gap<=MAX_SAMPLE_GAP&&now.getTime()-Date.parse(prior.timestamp)<=MAX_PAUSE*60000&&
    previous.count<=prior.count;
   event=continuing?{
    ...prior,timestamp:iso,count:reading,
