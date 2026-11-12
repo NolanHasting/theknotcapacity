@@ -33,12 +33,6 @@ function dayChart(d){
    shapes+=`<circle cx="${x(Date.parse(cur.timestamp)).toFixed(2)}" cy="${y(cur.count).toFixed(2)}" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Possible staff recount</title></circle>`;
   }
  }
- if(d.dataState==='live'&&Number.isFinite(d.estimatedNow)&&Number.isFinite(nowTs)){
-  const src=history[history.length-1]?.count;
-  const xx=x(nowTs).toFixed(2),yy=y(d.estimatedNow).toFixed(2);
-  if(Number.isFinite(src))shapes+=`<line x1="${xx}" x2="${xx}" y1="${y(src).toFixed(2)}" y2="${yy}" stroke="#7dc7e6" stroke-dasharray="2 4" opacity=".75"/>`;
-  shapes+=`<circle cx="${xx}" cy="${yy}" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Estimated current crowd: ${Math.round(d.estimatedNow)}</title></circle>`;
- }
  if(projected.length>1){
   const line=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
   const upper=projected.map((p,i)=>(i?'L':'M')+x(p.ts).toFixed(2)+' '+y(p.high).toFixed(2)).join(' ');
