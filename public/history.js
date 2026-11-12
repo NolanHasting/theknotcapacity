@@ -62,12 +62,12 @@
   html+='<line x1="'+left+'" x2="'+right+'" y1="'+y(100)+'" y2="'+y(100)+'" stroke="#cc7676" stroke-dasharray="5 5" opacity=".8"/>';
   html+='<path d="'+path+'" stroke="'+(isFuture?'#f0c468':'#fff')+'" stroke-width="2.4" fill="none" stroke-linejoin="round" stroke-linecap="round"'+(isFuture?' stroke-dasharray="6 4"':'')+'/>';
   if(!isFuture){
-   for(let i=1;i<source.length;i++){
-    const a=source[i-1],b=source[i];
-    const elapsed=(Date.parse(b.timestamp)-Date.parse(a.timestamp))/60000;
-    if(elapsed>0&&elapsed<=3&&a.count-b.count>=15){
-     html+='<circle cx="'+x(b.minute)+'" cy="'+y(b.count)+'" r="4" fill="#7dc7e6" stroke="#000" stroke-width="1"><title>Possible staff recount</title></circle>';
-    }
+   for(const event of (data.recounts||[])){
+    if(!Number.isFinite(event.count)||!Number.isFinite(Date.parse(event.timestamp)))continue;
+    const mx=x(localMinute(event.timestamp)),my=y(event.count);
+    const info='Staff recount · '+tick(localMinute(event.timestamp))+' · '+event.count+' reported · down '+event.drop;
+    html+='<path d="M'+mx+' '+(my-6)+' l6 6 -6 6 -6 -6 Z" fill="#9FD39B" stroke="#111" stroke-width="1.5"><title>'+safe(info)+'</title></path>';
+    html+='<circle class="chart-point" cx="'+mx+'" cy="'+my+'" r="10" fill="transparent" tabindex="0" role="button" aria-label="'+safe(info)+'" data-info="'+safe(info)+'"/>';
    }
   }
   if(!isFuture){
