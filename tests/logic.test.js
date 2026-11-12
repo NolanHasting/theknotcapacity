@@ -83,14 +83,14 @@ model=out.state;
 const after=new Date('2026-11-10T18:00:00Z');
 out=R.update(model,{timestamp:'2026-11-10T17:59:00Z',count:112},72,after);
 assert.equal(out.isReset,true);
-assert.ok(out.departureRate>0);
-assert.equal(out.estimatedNow,72);
+assert.equal(out.departureRate,null);
+assert.equal(out.estimatedNow,null);
 model=out.state;
 out=R.update(model,{timestamp:'2026-11-10T18:29:00Z',count:90},91,new Date('2026-11-10T18:30:00Z'));
 assert.equal(out.isReset,false);
-assert.ok(out.estimatedNow<91);
+assert.equal(out.estimatedNow,null);
 const anchored=L.forecast(91,10,{},new Date('2026-11-10T18:30:00Z'),out);
-assert.equal(anchored.points[0].count,out.estimatedNow);
+assert.equal(anchored.points[0].count,91);
 assert.equal(anchored.points.at(-1).count,0);
 // A sharp downward reset should not create a "leaving fast" trend.
 const inspected=R.inspect([
@@ -124,4 +124,38 @@ assert.ok(mid&&mid.count>40,'Afternoon forecast should rise when the recorded da
 assert.equal(shapeForecast.points[0].low,shapeForecast.points[0].high);
 assert.ok(shapeForecast.points[2].high-shapeForecast.points[2].low<shapeForecast.points[9].high-shapeForecast.points[9].low);
 assert.equal(shapeForecast.points.at(-1).count,0);
+
+const small=R.update({}, {timestamp:'2026-11-10T20:00:00Z',count:61},60,
+ new Date('2026-11-10T20:01:00Z'));
+assert.equal(small.isReset,true);
+assert.equal(small.isStrongReset,false);
+assert.equal(small.event.classification,'small_decrease');
+assert.equal(small.event.verified,false);
+const big=R.update({}, {timestamp:'2026-11-10T20:00:00Z',count:61},40,
+ new Date('2026-11-10T20:01:00Z'));
+assert.equal(big.event.classification,'likely_recount');
+assert.equal(R.update({}, {timestamp:'2026-11-10T20:00:00Z',count:61},62,
+ new Date('2026-11-10T20:01:00Z')).event,null);
+const A=require('../functions/analytics');
+const sampleDay=A.compactDay('2026-11-10',[
+ {timestamp:'2026-11-10T15:00:00Z',count:30},
+ {timestamp:'2026-11-10T15:01:00Z',count:40},
+ {timestamp:'2026-11-10T15:16:00Z',count:50}
+]);
+assert.equal(sampleDay.bins.length,2);
+assert.equal(sampleDay.bins[0].count,35);
+const snapshot=A.snapshot('2026-11-10',new Date('2026-11-10T15:00:00Z'),30,{
+ points:[{minutes:15,count:35,low:25,high:45},{minutes:30,count:45,low:30,high:60},{minutes:60,count:52,low:20,high:85}]
+});
+assert.equal(snapshot.targetMinutes[15].predicted,35);
+const metrics=A.scoreDay([
+ {timestamp:'2026-11-10T15:15:00Z',count:40},
+ {timestamp:'2026-11-10T15:30:00Z',count:44},
+ {timestamp:'2026-11-10T16:00:00Z',count:48},
+],[snapshot],[{timestamp:'2026-11-10T15:30:00Z',count:44,drop:12}]);
+assert.equal(metrics.horizons[15].sourceMAE,5);
+assert.equal(metrics.horizons[15].persistenceMAE,10);
+assert.equal(metrics.horizons[30].candidateRecountSamples,1);
+const summarized=H.future('2026-11-17',[{date:'2026-11-10',bins:sampleDay.bins}]);
+assert.equal(summarized.points.find(p=>p.minute===600).count,35);
 console.log('All backend logic tests passed.');
