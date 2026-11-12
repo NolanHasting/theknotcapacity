@@ -72,11 +72,16 @@ function renderHeat(cells){
 }
 function renderBest(items){
  const options=(items||[]).filter(x=>Number.isFinite(x.average));
- $('besttimes').innerHTML=options.length?options.map(v=>'<div class="bestitem"><div class="eyebrow">'+esc(v.day)+' · '+esc(hourLabel(v.hour))+'</div><strong>'+v.average+' <small>avg. reported</small></strong><small>Based on '+v.days+' day'+(v.days===1?'':'s')+'</small><small class="reliability">'+(v.days>=3?'Some history':'Limited history')+'</small></div>').join(''):
- '<div class="fine">No comparable upcoming hours yet. Check back as more days are recorded.</div>';
+ const isPrediction=x=>x.source==='forecast';
+ $('besttimes').innerHTML=options.length?options.map(v=>{
+  const basis=isPrediction(v)?'Forecast for today':'Past '+v.days+' day'+(v.days===1?'':'s');
+  const extra=isPrediction(v)?(v.days>=2?' · '+v.days+' matching days':' · Limited history'):' · '+(v.days>=3?'Based on several days':'Limited history');
+  return '<div class="bestitem"><div class="eyebrow">'+esc(v.day)+' · '+esc(hourLabel(v.hour))+'</div><strong>'+v.average+' <small>expected people</small></strong><small>'+esc(basis)+esc(extra)+'</small></div>';
+ }).join(''):
+ '<div class="fine">Not enough information to suggest a quieter hour yet.</div>';
  const top=options[0];
  $('bestQuick').textContent=top?hourLabel(top.hour).replace(':00',''):'—';
- $('bestQuickNote').textContent=top?top.average+' avg. reported · '+top.days+' day'+(top.days===1?'':'s'):'Not enough history yet';
+ $('bestQuickNote').textContent=top?(top.source==='forecast'?'Forecast: '+top.average:'Past avg: '+top.average)+' people':'Not enough history yet';
 }
 function insightDetails(d,live){
  const items=[];
@@ -89,7 +94,7 @@ function insightDetails(d,live){
    items.push({title:'ADJUSTED ESTIMATE',value:d.estimatedNow+' people',detail:'Based on likely recounts · approximate'});
   }else items.push({title:'ADJUSTED ESTIMATE',value:'—',detail:'Not enough likely recounts yet'});
   const best=(d.bestTimes||[])[0];
-  if(best)items.push({title:'QUIETER LATER',value:hourLabel(best.hour),detail:best.average+' average reported · '+best.days+' matching day'+(best.days===1?'':'s')});
+  if(best)items.push({title:'QUIETER LATER',value:hourLabel(best.hour),detail:(best.source==='forecast'?'Forecast: ':'Past average: ')+best.average+' people · '+(best.days>=2?best.days+' matching days':'Limited history')});
  }else items.push({title:'CURRENT STATUS',value:(d.dataState||'offline').toUpperCase(),detail:'Live comparisons unavailable'});
  $('insightDetails').innerHTML=items.map(x=>'<div class="insight-item"><div class="eyebrow">'+esc(x.title)+'</div><strong>'+esc(x.value)+'</strong><small>'+esc(x.detail)+'</small></div>').join('');
 }
@@ -104,14 +109,14 @@ function render(d){
  $('open').textContent=closed?'CLOSED HOURS':live?'OPEN NOW':delayed?'LAST KNOWN COUNT':'DATA UNAVAILABLE';
  $('trend').textContent=live?(d.trendLabel||'LEARNING'):'—';$('trend').style.color=live?'#fff':'#aaa';
  $('fill').style.width=closed||state==='offline'||!Number.isFinite(d.percent)?'0%':Math.min(100,d.percent)+'%';$('fill').style.background=color;
- $('capacity').textContent=closed?'Outside configured hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 max capacity'+(d.count>100?' · above policy limit':''):'—';
+ $('capacity').textContent=closed?'Outside gym hours':state!=='offline'&&Number.isFinite(d.percent)?d.percent+'% of 100 reference'+(d.count>100?' · above reference':''):'—';
  $('updated').textContent=d.sourceUpdated?'Last received '+time(d.sourceUpdated):'No reading received';
  $('estimatedNow').textContent=live&&Number.isFinite(d.estimatedNow)?d.estimatedNow:'—';
  $('estimateNote').textContent=live&&Number.isFinite(d.estimatedNow)?'Adjusted from likely recounts':'Not enough recounts yet';
  $('usual').textContent=d.typicalNow==null?'—':d.typicalNow;
- $('usualNote').textContent=(d.typicalDays||0)+' matching days';
+ $('usualNote').textContent=d.typicalDays>=2?d.typicalDays+' matching days':'Limited history';
  $('next').textContent=live&&d.forecast?d.forecast.projected:'—';
- $('nextNote').textContent=live&&d.forecast?'exploratory · '+Math.min(60,d.forecast.horizonMinutes)+' min ahead':'not available';
+ $('nextNote').textContent=live&&d.forecast?'Estimated in '+Math.min(60,d.forecast.horizonMinutes)+' min':'Not available';
  
  $('insight').textContent=d.warning||(!live?'Current crowd data is unavailable.':d.estimatedNow!=null?'The adjusted estimate accounts for possible staff recounts. The reported count remains unchanged.':'The displayed count comes directly from the gym. Crowd estimates will improve as more likely recounts are recorded.');
  insightDetails(d,live);
