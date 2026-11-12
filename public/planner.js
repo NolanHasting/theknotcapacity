@@ -1,6 +1,6 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,
- sendEmailVerification,signOut as firebaseSignOut} from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
+ sendEmailVerification,reload as reloadUser,signOut as firebaseSignOut} from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
 import {getMessaging,getToken,deleteToken,isSupported} from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging.js';
 'use strict';
 const el=id=>document.getElementById(id),html=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -8,7 +8,11 @@ const weekday=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],shortTime=m=>{
  const h=Math.floor(m/60),suffix=h<12?'AM':'PM';
  return (h%12||12)+(m%60?':'+String(m%60).padStart(2,'0'):'')+' '+suffix;
 };
-const localDate=(d=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+const localDate=(d=new Date())=>{
+ const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',
+  year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d).map(x=>[x.type,x.value]));
+ return p.year+'-'+p.month+'-'+p.day;
+};
 const addDays=(date,n)=>{const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
 let auth=null,app=null,current=null,profile=null,token=null,sw=null,loading=false,selectedDays=[1,2,3,4,5],myPlans=[],friends=[];
 const info=(msg,error=false)=>{const target=el('plannerMessage');target.textContent=msg||'';target.classList.toggle('is-error',error);};
@@ -79,7 +83,7 @@ async function loadFriends(){
  items.sort((a,b)=>a.date.localeCompare(b.date)||a.startMinute-b.startMinute);
  let content=items.length?items.map(p=>{
   const mine=myPlans.find(x=>x.date===p.date&&x.startMinute<p.endMinute&&x.endMinute>p.startMinute);
-  const overlap=mine?' · '+Math.min(p.endMinute,mine.endMinute)-Math.max(p.startMinute,mine.startMinute)+' min overlap with your plan':'';
+  const overlap=mine?' · '+(Math.min(p.endMinute,mine.endMinute)-Math.max(p.startMinute,mine.startMinute))+' min overlap with your plan':'';
   return '<div class="planner-item"><div><strong>'+html(p.friendName)+'</strong><small>'+html(p.date)+' · '+shortTime(p.startMinute)+'–'+shortTime(p.endMinute)+html(overlap)+'</small></div></div>';
  }).join(''):empty('Your friends have no shared upcoming sessions.');
  el('friendPlans').innerHTML=content;
@@ -97,6 +101,7 @@ function error(e){const code=e?.code||'';return ({
  'auth/network-request-failed':'Connection unavailable. Try again.'
  })[code]||e?.message||'Something went wrong.';}
 async function handleAuth(user){
+ if(user&&!user.emailVerified){try{await reloadUser(user);}catch(_){}}
  current=user;el('loginSection').hidden=!!user&&user.emailVerified;el('plannerPrivate').hidden=!user||!user.emailVerified;
  if(!user){el('plannerConnection').textContent='Private by default';return;}
  if(!user.emailVerified){el('plannerConnection').textContent='Email verification needed';
