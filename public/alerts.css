@@ -1,0 +1,47 @@
+.alerts-shell{max-width:1050px}
+.alerts-header{gap:20px}
+.alerts-back{font-weight:650;color:#dfdfdf;text-decoration:none;font-size:13px}
+.alerts-back:hover,.alerts-back:focus-visible{color:#fff;text-decoration:underline}
+.alerts-hero{padding:45px 0 30px;max-width:720px}
+.alerts-hero h1{font-size:clamp(36px,7vw,67px);letter-spacing:-.055em;line-height:1.06;margin:12px 0 16px}
+.alerts-hero>p{font-size:clamp(15px,2.2vw,19px);color:#cacaca;line-height:1.55;max-width:670px}
+.alerts-status{margin-top:20px;font-size:13px;color:#a9deb2}
+.alerts-status.error{color:#ff9595}
+.alerts-grid{display:grid;grid-template-columns:minmax(0,1.06fr) minmax(0,.94fr);gap:18px;align-items:start}
+.alerts-card{padding:clamp(18px,2.5vw,27px);min-width:0}
+.alerts-card h2{font-size:clamp(21px,2.6vw,27px);font-weight:680;letter-spacing:-.025em;margin:9px 0 24px}
+.alerts-card h3{font-size:17px;margin:0 0 10px}
+.alerts-label{display:block;color:#e7e7e7;font-size:13px;font-weight:600;margin:19px 0 9px}
+.alerts-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.alerts-day{background:#111;color:#bcbcbc;border:1px solid #414141;padding:10px 2px;border-radius:9px;cursor:pointer;font:inherit;font-weight:640;font-size:12px}
+.alerts-day.selected{background:#e7ebdf;border-color:#e7ebdf;color:#101410}
+.alerts-day:focus-visible,.alerts-primary:focus-visible,.alerts-code button:focus-visible{outline:2px solid #9fd39b;outline-offset:3px}
+.alerts-time{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+.alerts-time label{display:flex;flex-direction:column;gap:8px;color:#ddd;font-weight:600;font-size:13px}
+.alerts-time select,.alerts-card input[type=tel],.alerts-threshold-row input[type=number]{min-height:43px;border-radius:8px;border:1px solid #515151;background:#101010;color:#fff;padding:9px 12px;font:inherit}
+.alerts-card input[type=tel]{display:block;width:100%}
+.alerts-threshold{margin:24px 0 4px;padding:6px 14px;border-radius:11px;border:1px solid #343a33;background:#0b0f0b}
+.alerts-threshold-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0}
+.alerts-threshold-row+.alerts-threshold-row{border-top:1px solid #313631}
+.alerts-threshold-row label{display:flex;align-items:center;gap:9px;line-height:1.4;font-size:13px}
+.alerts-threshold-row input[type=number]{width:78px;text-align:center;font-weight:650}
+.alerts-threshold-row input[type=number]:disabled{opacity:.4}
+.alerts-consent{display:flex;align-items:flex-start;gap:12px;font-size:11.5px;color:#bdbdbd;line-height:1.6;margin:23px 0 20px}
+.alerts-consent input,.alerts-threshold-row input[type=checkbox]{accent-color:#a9d7a0;flex:none;margin-top:3px}
+.alerts-primary{display:flex;justify-content:center;align-items:center;width:100%;text-align:center;color:#0b100a;background:#e9eee4;border:1px solid #e9eee4;border-radius:10px;font:inherit;font-weight:700;text-decoration:none;padding:13px 16px;min-height:46px;cursor:pointer}
+.alerts-primary:hover:not(:disabled){background:#bde1b7;border-color:#bde1b7}
+.alerts-primary:disabled{opacity:.4;cursor:not-allowed}
+.alerts-fine{font-size:12px;color:#b7b7b7;line-height:1.6;margin:10px 0}
+.alerts-confirmation{border-top:1px solid #555;padding-top:22px;margin-top:26px}
+.alerts-confirmation p{color:#c6c6c6;font-size:13px}
+.alerts-code{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;background:#151b14;border:1px solid #566452;border-radius:9px;margin:12px 0}
+.alerts-code strong{font-size:18px;letter-spacing:.035em}
+.alerts-code button{border:1px solid #596559;color:#e9eee4;border-radius:7px;padding:7px 12px;background:#242d23;cursor:pointer}
+.alerts-open{margin:15px 0 0}
+.alerts-command{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px 0;border-bottom:1px solid #333}
+.alerts-command code{font-size:12px;font-weight:700;white-space:nowrap;color:#a9d7a0}
+.alerts-command span{color:#c0c0c0;text-align:right;font-size:12px;line-height:1.4}
+.alerts-stop code{color:#ff9b9b}
+.alerts-card aside{display:block}
+@media(max-width:780px){.alerts-grid{grid-template-columns:1fr}.alerts-hero{padding:32px 0 24px}}
+@media(max-width:450px){.alerts-day{font-size:11px;padding:10px 0}.alerts-days{gap:3px}.alerts-threshold{padding:5px 10px}.alerts-command span{max-width:52%}.alerts-header{justify-content:space-between}}
