@@ -156,6 +156,6 @@ const metrics=A.scoreDay([
 assert.equal(metrics.horizons[15].sourceMAE,5);
 assert.equal(metrics.horizons[15].persistenceMAE,10);
 assert.equal(metrics.horizons[30].candidateRecountSamples,1);
-const summarized=H.future('2026-11-17',[{date:'2026-11-10',bins:sampleDay.bins}]);
+const summarized=H.future('2026-11-17',[{date:'2026-11-10',bins:[{minute:600,count:35,samples:15},{minute:615,count:50,samples:15}]}]);
 assert.equal(summarized.points.find(p=>p.minute===600).count,40);
 console.log('All backend logic tests passed.');
