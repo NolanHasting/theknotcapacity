@@ -100,7 +100,7 @@ function best(weekly,now=new Date()){
  }
  return options.sort((a,b)=>a.average-b.average||a.hour-b.hour).slice(0,4);
 }
-function forecast(count,rate,weekly,now){
+function forecast(count,rate,weekly,now,correction=null){
  const p=parts(now),minutes=remainingMinutes(p);
  if(minutes<=0||!Number.isFinite(count))return null;
  const start=typical(weekly,p),hasBaseline=start.average!==null&&start.days>=2;
@@ -108,7 +108,7 @@ function forecast(count,rate,weekly,now){
  const steps=[0];for(let m=15;m<minutes;m+=15)steps.push(m);
  if(steps[steps.length-1]!==minutes)steps.push(minutes);
  // Source values above the policy reference of 100 are valid; do not truncate them.
- const safeStart=Math.max(0,count);
+ const safeStart=Math.max(0,Number.isFinite(correction?.estimatedNow)?correction.estimatedNow:count);
  for(const m of steps){
   const at=parts(new Date(now.getTime()+m*60000)),target=typical(weekly,at);
   // Trend impact saturates instead of being extrapolated linearly to closing.
@@ -126,16 +126,19 @@ function forecast(count,rate,weekly,now){
   // taper toward closing; the first point always stays equal to the observation.
   const tillClose=minutes-m;
   const closure=m===0?1:clamp(tillClose/Math.min(minutes,75),0,1);
-  const estimate=Math.max(0,Math.round((safeStart+(1-evidence)*drift+evidence*historicalDelta*influence)*closure));
+  // The live projection is anchored to estimated current occupancy, never a fabricated exact headcount.
+  const departureRate=Number.isFinite(correction?.departureRate)?correction.departureRate:0;
+  const departures=departureRate>0?Math.min(m,60)*departureRate*0.45:0;
+  const estimate=Math.max(0,Math.round((safeStart+(1-evidence)*drift+evidence*historicalDelta*influence-departures)*closure));
   // These are illustrative scenarios, not calibrated confidence intervals.
   const spread=m===0||m===minutes?0:Math.min(35,8+5*Math.sqrt(m/60)+(hasBaseline?3:8))*closure;
   predicted.push({minutes:m,count:estimate,low:Math.max(0,Math.round(estimate-spread)),high:Math.max(estimate,Math.round(estimate+spread))});
  }
  const hour=predicted.find(r=>r.minutes===60)||predicted.find(r=>r.minutes>=60)||predicted[predicted.length-1];
- return {current:count,projected:hour.count,change:hour.count-count,closing:predicted[predicted.length-1].count,
+ return {current:count,estimatedStart:safeStart,projected:hour.count,change:hour.count-safeStart,closing:predicted[predicted.length-1].count,
   points:predicted,horizonMinutes:minutes,confidence:hasBaseline?'DEVELOPING':'EARLY',matchingDays:start.days,
-  method:hasBaseline?'Smoothed recent movement + growing weekday history':'Smoothed recent movement / persistence',
-  disclaimer:'Exploratory forecast; shaded range is illustrative, not a calibrated confidence interval. Rapid negative source corrections are excluded from movement estimates. A zero reading at closing is a modeled assumption, not a measured count.'};
+  method:Number.isFinite(correction?.estimatedNow)?'Recount-based estimate + recent movement':'Recent movement + limited history',
+  disclaimer:'Forecasts are estimates. Sudden drops may be staff recounts. The closing-time zero is a schedule assumption, not an observed reading.'};
 }
 function summarize(status,day,week,now=new Date()){
  const recent=(day&&day.points)||[],p=parts(now);
