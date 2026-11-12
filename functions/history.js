@@ -45,11 +45,14 @@ function future(date,records){
  const analysis=R.inspect(all);
  const rate=Number.isFinite(analysis.state.departuresPerMinute)&&analysis.state.rateSamples>=2?
   analysis.state.departuresPerMinute:null;
+ const resets=analysis.results.filter(v=>v.isReset).map(v=>Date.parse(v.timestamp));
  const daily=baseline.map(r=>{
-  const adjusted=rate===null?r.points:r.points.map(p=>{
+  let pointer=0,lastReset=null;
+  const sorted=r.points.slice().sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
+  const adjusted=rate===null?sorted:sorted.map(p=>{
    const t=Date.parse(p.timestamp);
-   const previous=analysis.results.filter(v=>v.isReset&&Date.parse(v.timestamp)<=t).at(-1);
-   const elapsed=previous?(t-Date.parse(previous.timestamp))/60000:null;
+   while(pointer<resets.length&&resets[pointer]<=t)lastReset=resets[pointer++];
+   const elapsed=lastReset===null?null:(t-lastReset)/60000;
    return {...p,count:elapsed!==null&&elapsed>=0&&elapsed<=180?
     Math.max(0,Math.round(p.count-rate*elapsed)):p.count};
   });
