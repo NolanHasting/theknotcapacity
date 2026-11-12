@@ -1,0 +1,56 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#050705">
+<meta name="description" content="Get a text when The Knot's crowd crosses your preferred occupancy level.">
+<title>Text Alerts · Knot Capacity</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/alerts.css">
+</head><body><main class="alerts-shell">
+<header class="alerts-header"><a href="/" class="alerts-back">← Live capacity</a><div class="brand"><img src="/logo.png" alt=""><div><div class="brand-name">THE KNOT</div><div class="brand-sub">CAPACITY ALERTS</div></div></div></header>
+<section class="alerts-hero"><div class="eyebrow">TEXT ALERTS</div>
+<h1>Know when to climb.</h1><p>Get a text when the gym's reported crowd crosses a number you choose, during the hours you're available.</p>
+<div id="smsStatus" role="status" class="alerts-status">Checking text alert availability…</div></section>
+<section class="alerts-grid">
+<article class="panel alerts-card" aria-labelledby="customizeTitle">
+<div class="eyebrow">01 / YOUR PREFERENCES</div><h2 id="customizeTitle">Set your alerts</h2>
+<form id="smsForm">
+<label class="alerts-label">Days you usually climb</label>
+<div id="smsDays" class="alerts-days" role="group" aria-label="Climbing days"></div>
+<div class="alerts-time">
+<label>From <select id="smsStart"></select></label>
+<label>Until <select id="smsEnd"></select></label>
+</div>
+<div class="alerts-threshold">
+<div class="alerts-threshold-row"><label><input type="checkbox" id="smsBelowOn" checked> When the count drops below</label><input id="smsBelow" type="number" min="5" max="200" step="1" value="50" inputmode="numeric" aria-label="Below threshold"></div>
+<div class="alerts-threshold-row"><label><input type="checkbox" id="smsAboveOn"> When the count rises above</label><input id="smsAbove" type="number" min="5" max="200" step="1" value="90" inputmode="numeric" aria-label="Above threshold"></div>
+</div>
+<label class="alerts-label" for="smsPhone">Mobile number (U.S.)</label>
+<input id="smsPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="(352) 555-0123" required>
+<label class="alerts-consent"><input type="checkbox" id="smsConsent" required><span>I agree to receive recurring automated occupancy alert texts from <strong>Knot Capacity</strong>, an independent site, at the number above. Up to 3 alerts per day. Consent is not required to use the live tracker. Message and data rates may apply. Reply <strong>STOP</strong> to unsubscribe or <strong>HELP</strong> for help.</span></label>
+<button type="submit" id="smsSubmit" class="alerts-primary" disabled>Set up text alerts</button>
+<p class="alerts-fine" id="smsSubmitNote">Text alerts require a connected texting number.</p>
+</form>
+<section id="smsJoin" class="alerts-confirmation" hidden aria-live="polite">
+<h3>Finish signing up from your phone</h3><p>Send this exact message from the number you entered. Your alerts won't start until you text us.</p>
+<div class="alerts-code"><strong id="smsCode">JOIN --------</strong><button id="copySmsCode" type="button">Copy</button></div>
+<p>Send to <strong id="smsDestination">—</strong> within 30 minutes.</p>
+<a id="smsOpenMessages" class="alerts-primary alerts-open" href="#">Open Messages</a>
+</section>
+</article>
+<aside class="panel alerts-card" aria-labelledby="editTitle">
+<div class="eyebrow">02 / CHANGE IT ANYTIME</div><h2 id="editTitle">Manage alerts by text</h2>
+<p class="alerts-fine">You won't need an account or password. Just reply in the same text conversation.</p>
+<div class="alerts-command"><code>STATUS</code><span>See your active preferences</span></div>
+<div class="alerts-command"><code>BELOW 45</code><span>Change your quieter-crowd alert</span></div>
+<div class="alerts-command"><code>ABOVE 90</code><span>Change your busy-crowd alert</span></div>
+<div class="alerts-command"><code>DAYS MON WED FRI</code><span>Choose your climbing days</span></div>
+<div class="alerts-command"><code>HOURS 4PM-9PM</code><span>Adjust your alert window</span></div>
+<div class="alerts-command"><code>OFF ABOVE</code><span>Turn off one alert type</span></div>
+<div class="alerts-command"><code>PAUSE</code><span>Temporarily stop messages</span></div>
+<div class="alerts-command"><code>RESUME</code><span>Restart paused alerts</span></div>
+<div class="alerts-command alerts-stop"><code>STOP</code><span>Unsubscribe from all texts</span></div>
+<p class="alerts-fine">Reply <strong>HELP</strong> for the full command list. Texts are only sent during your selected days and hours, with a cooldown to avoid repeated alerts near a threshold.</p>
+</aside>
+</section>
+<footer><span>INDEPENDENT PROJECT · NOT AFFILIATED WITH THE KNOT</span><a href="/">Back to live capacity</a></footer>
+</main><script defer src="/alerts.js"></script></body></html>
