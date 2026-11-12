@@ -57,3 +57,5 @@ footer{margin-top:27px;border-top:1px solid var(--line);padding-top:18px;display
 .insight-item strong{display:block;margin:8px 0 4px;font-size:clamp(16px,2.2vw,24px);line-height:1.15;font-variant-numeric:tabular-nums}
 .insight-item small{display:block;color:var(--muted);font-size:11px}
 @media(max-width:670px){.insight-grid{grid-template-columns:1fr}.insight-item{padding:12px}}
+
+.legend i.recount{width:10px;height:10px;border-radius:50%;background:#7dc7e6}
