@@ -14,6 +14,25 @@ function compactDay(date,points){
   bins:Array.from(bins,([minute,v])=>({minute,count:Math.round(v.sum/v.n),samples:v.n}))
    .sort((a,b)=>a.minute-b.minute)};
 }
+function rebuildQuarter(days){
+ const quarter={};
+ for(const doc of days||[]){
+  const date=doc.date;
+  if(typeof date!=='string')continue;
+  const day=compactDay(date,doc.points||[]);
+  // 17:00 UTC is safely inside the same local date in America/New_York.
+  const dow=L.parts(new Date(date+'T17:00:00Z')).dow;
+  for(const bin of day.bins){
+   if(bin.samples<5)continue;
+   const key=dow+'-'+Math.floor(bin.minute/15);
+   const value=quarter[key]||{completedMeanSum:0,completedDays:0,days:0,sum:0,n:0};
+   value.completedMeanSum+=bin.count;value.completedDays++;
+   value.days++;value.sum+=bin.count;value.n++;
+   quarter[key]={...value,lastDay:'',activeSum:0,activeN:0};
+  }
+ }
+ return quarter;
+}
 function snapshot(date,now,count,forecast){
  if(!forecast?.points||!Number.isFinite(count))return null;
  const at={};
@@ -66,4 +85,4 @@ function scoreDay(readings,snapshots,recountEvents=[]){
    candidateRecountMAE:avg(g.recountErrors),illustrativeBandCoverage:g.bands?round(100*g.bandHits/g.bands):null}];
  })),explanation:'Source error measures reported counts, not verified occupancy; candidate recount errors are weak labels.'};
 }
-module.exports={compactDay,snapshot,scoreDay,matchObservation,SNAPSHOT_MINUTES,MIN_COVERAGE};
+module.exports={compactDay,rebuildQuarter,snapshot,scoreDay,matchObservation,SNAPSHOT_MINUTES,MIN_COVERAGE};
