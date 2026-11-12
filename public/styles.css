@@ -40,3 +40,13 @@ footer{margin-top:27px;border-top:1px solid var(--line);padding-top:18px;display
 .heat-scale{display:flex;align-items:center;gap:12px;margin-top:18px;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.03em}
 .heat-gradient{flex:1;height:10px;border-radius:4px;background:linear-gradient(90deg,#123f32 0%,#196047 9%,#257b4d 18%,#40945b 27%,#65a45b 36%,#96ac52 45%,#c1a248 54%,#d88c36 63%,#dd7130 72%,#d9582e 81%,#c83b34 90%,#a51f3d 100%)}
 @media(max-width:500px){.heat-scale{gap:6px;font-size:9px}}
+
+.history-panel{margin-top:10px}
+.history-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.history-control{display:flex;align-items:center;gap:8px;margin-top:9px}
+.history-control input{background:#0b0b0b;color:#fff;border:1px solid rgba(255,255,255,.65);border-radius:8px;padding:8px 10px;font:inherit;color-scheme:dark;min-height:37px}
+.history-control input:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.history-summary{margin-top:18px;font-size:14px;font-weight:650}
+.history-chart{min-width:700px;max-width:1000px;aspect-ratio:760/285}
+#historyNote{margin-top:10px;line-height:1.5}
+@media(max-width:500px){.history-toolbar{align-items:flex-start}.history-control{gap:5px}.history-control input{padding:8px 5px}}
