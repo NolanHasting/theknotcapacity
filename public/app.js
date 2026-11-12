@@ -64,7 +64,7 @@ function renderHeat(cells){
    const v=indexed.get(d+'-'+h);
    const recorded=v&&Number.isFinite(v.average);
    const color=recorded?heatColor(v.average):'#202020';
-   const title=recorded?`${days[d]} ${hourLabel(h)} · ${v.average} average occupants · ${v.days||0} matching days · ${v.samples} readings`:'No readings recorded for this hour';
+   const title=recorded?`${days[d]} ${hourLabel(h)} · ${v.average} average occupants · ${v.days||0} matching days · ${v.samples} samples`:'No counts recorded for this hour';
    html+='<div class="cell" style="background:'+color+'" title="'+esc(title)+'" aria-label="'+esc(title)+'"></div>';
   }
  }
