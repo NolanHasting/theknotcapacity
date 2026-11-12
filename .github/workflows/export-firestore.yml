@@ -1,0 +1,39 @@
+name: Export historical Firestore occupancy data
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci --prefix functions
+      - name: Configure Firebase read credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THEKNOTCAPACITY }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Missing FIREBASE_SERVICE_ACCOUNT_THEKNOTCAPACITY"
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firestore-export-sa.json"
+          chmod 600 "$RUNNER_TEMP/firestore-export-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firestore-export-sa.json" >> "$GITHUB_ENV"
+      - name: Export Firestore data
+        run: node functions/export-firestore.js
+      - name: Upload private workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knot-firestore-export
+          path: exports/
+          if-no-files-found: error
+          retention-days: 3
