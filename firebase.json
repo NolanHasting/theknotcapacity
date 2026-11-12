@@ -15,6 +15,13 @@
     ],
     "rewrites": [
       {
+        "source": "/api/planner",
+        "function": {
+          "functionId": "plannerApi",
+          "region": "us-east1"
+        }
+      },
+      {
         "source": "/api/history",
         "function": {
           "functionId": "getHistory",
@@ -54,6 +61,19 @@
           {
             "key": "Cache-Control",
             "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/firebase-messaging-sw.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          },
+          {
+            "key": "Service-Worker-Allowed",
+            "value": "/"
           }
         ]
       }
