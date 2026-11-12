@@ -66,9 +66,11 @@ function future(date,records){
    const untilClose=range[1]*60-minute;
    avg=Math.max(0,Math.round(avg*Math.min(1,untilClose/60)));
   }
-  points.push({minute,count:avg,days:means.length});
+  const dispersion=means.length>=2?Math.sqrt(means.reduce((sum,x)=>sum+(x-avg)**2,0)/means.length):null;
+  const width=avg===null?null:Math.max(10,dispersion===null?20:Math.round(dispersion*1.25));
+  points.push({minute,count:avg,low:avg===null?null:Math.max(0,Math.round(avg-width)),high:avg===null?null:Math.round(avg+width),days:means.length});
  }
- points.push({minute:range[1]*60,count:0,days:0,assumedClose:true});
+ points.push({minute:range[1]*60,count:0,low:0,high:0,days:0,assumedClose:true});
  const observed=points.filter(p=>p.count!==null&&!p.assumedClose);
  return {mode:'future',date,points:observed.length?points:[],
   summary:{matchingWeekdays:same.length,referenceDays:baseline.length,coveredSlots:observed.length,totalSlots:range[1]*4-range[0]*4,
