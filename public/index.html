@@ -5,7 +5,6 @@
 <title>THE KNOT CAPACITY</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
 <link rel="apple-touch-icon" href="/logo.png">
-<link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/styles.css"></head><body><main>
 <header><div class="brand"><img src="/logo.png" alt="The Knot climbing gym logo">
 <div><div class="brand-name">THE KNOT</div><div class="brand-sub">OCCUPANCY DASHBOARD</div></div></div>
@@ -29,7 +28,7 @@
 </section>
 <div class="tabs"><button class="tab active" data-tab="insights">Insights</button><button class="tab" data-tab="patterns">Weekly patterns</button><button class="tab" data-tab="best">Best times</button></div>
 <section class="view active" id="insights"><article class="panel"><div class="eyebrow">WHAT THE NUMBERS MEAN</div><p class="insight" id="insight">Analyzing today's readings.</p><div class="fine" id="logged">Last logged reading —</div></article></section>
-<section class="view" id="patterns"><article class="panel"><div class="charthead"><h3>Average occupancy by weekday and hour</h3><span>HISTORICAL</span></div><p class="fine">Empty cells indicate no recorded history.</p><div class="heat" id="heatmap"></div></article></section>
+<section class="view" id="patterns"><article class="panel"><div class="charthead"><h3>Average occupancy by weekday and hour</h3><span>HISTORICAL</span></div><p class="fine">Historical averages by weekday and hour. Hover over a cell for the number of days and readings; patterns with limited coverage are preliminary.</p><div class="heat" id="heatmap"></div><div class="heat-scale" aria-label="Occupancy color scale from zero to 100 plus people"><span>0 · QUIETER</span><div class="heat-gradient"></div><span>100+ · BUSIER</span></div><p class="fine">Dark gray indicates no recorded history. Colors use twelve occupancy levels instead of four.</p></article></section>
 <section class="view" id="best"><article class="panel"><div class="charthead"><h3>Upcoming quieter hours today</h3><span>HISTORICAL · PROVISIONAL</span></div><div class="best" id="besttimes"></div></article></section>
 <footer><span>NOLAN HASTING</span><span>Count Updated Every Minute · Independent Project</span></footer>
 </main><script defer src="/app.js"></script></body></html>
