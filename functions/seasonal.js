@@ -131,7 +131,7 @@ function project(count,trend,seasonal,now,calibration=null){
  const hour=predictions.find(x=>x.minutes===60)||predictions.find(x=>x.minutes>60)||predictions.at(-1);
  const requested=[15,30,60,120,240,480].filter(n=>n<=remaining);
  const calibrated=requested.length>0&&requested.every(n=>calibration?.horizons?.[n]?.days>=4&&calibration?.horizons?.[n]?.samples>=25);
- return {current:count,estimatedStart:count,projected:hour.count,change:hour.count-count,
+ return {modelVersion:'recount-seasonal-v4',current:count,estimatedStart:count,projected:hour.count,change:hour.count-count,
   closing:predictions.at(-1).count,points:predictions,horizonMinutes:remaining,
   confidence:support>=4?'DEVELOPING':'EARLY',matchingDays:support,
   method:'Live reported count + staff-recount historical profile',
