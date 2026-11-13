@@ -165,4 +165,26 @@ function backtest(docs,now=new Date()){
   return [h,{samples:r.length,days:unique,p80:r.length>=25&&unique>=4?quantile(r.map(x=>x.error),.8):null}];
  }))};
 }
-module.exports={anchorPoints,train,profile,band,project,backtest,quantile};
+function futureDay(date,seasonal){
+ const local=L.parts(new Date(date+'T17:00:00Z')),dow=local.dow;
+ const [open,close]=L.HOURS[dow],points=[];
+ for(let m=open*60;m<close*60;m+=SLOT){
+  const fit=profile(seasonal,{dow,hour:Math.floor(m/60),minute:m%60});
+  const untilClose=close*60-m;
+  const closing=Math.min(1,untilClose/45);
+  const count=fit&&fit.days?Math.max(0,Math.round(fit.count*closing)):null;
+  // These are seasonal profile ranges, not certified prediction intervals.
+  // Variation across different recount days matters more than polling frequency.
+  const halfWidth=count===null?null:Math.max(12,fit.spread||0,Math.sqrt(m-open*60)*2)*closing;
+  points.push({minute:m,count,low:count===null?null:Math.max(0,Math.round(count-halfWidth)),
+   high:count===null?null:Math.round(count+halfWidth),days:fit?.days||0});
+ }
+ points.push({minute:close*60,count:0,low:0,high:0,days:0,assumedClose:true});
+ const known=points.filter(p=>p.count!==null&&!p.assumedClose);
+ return {mode:'future',date,points:known.length?points:[],basis:'past staff recounts',
+  summary:{referenceDays:seasonal.days||0,matchingWeekdays:0,coveredSlots:known.length,
+   totalSlots:(close-open)*4,possibleRecounts:seasonal.recounts||0,recountAdjusted:true},
+  note:known.length?'Historical staff recounts anchor these estimates. Shaded range is provisional. Zero at close is assumed.':
+  'Not enough staff recount history to estimate this day.'};
+}
+module.exports={anchorPoints,train,profile,band,project,backtest,futureDay,quantile};
