@@ -9,6 +9,7 @@ const H=require('./history');
 const R=require('./recounts');
 const A=require('./analytics');
 const S=require('./seasonal');
+const {health}=require('./health');
 initializeApp();
 const db=getFirestore();
 const REGION='us-east1';
@@ -92,16 +93,16 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
  maxInstances:3,invoker:'public',serviceAccount:RUNTIME_SERVICE_ACCOUNT},async(req,res)=>{
  if(req.method!=='GET'){res.status(405).json({ok:false,error:'GET only'});return;}
  try{
-  const p=L.parts(new Date());
-  const shouldBeOpen=L.openNow(p);
+  const now=new Date(),p=L.parts(now);
   const [s,d,w,a]=await Promise.all([STATUS.get(),db.collection('days').doc(p.day).get(),WEEKLY.get(),db.collection('system').doc('forecastAccuracy').get()]);
   if(!s.exists){res.status(503).set('Cache-Control','no-store').json({ok:false,error:'No reading exists yet. Check that collectOccupancy is deployed, enabled, and running in Firebase Scheduler.'});return;}
   const status=s.data(),weekly=w.exists?w.data():{};
   let response=L.summarize(status,d.exists?d.data():{},weekly);
   // Schedule and collection health are independent. A failed opening/closing
   // collector must never make yesterday's CLOSED/OPEN state look current.
-  response.open=shouldBeOpen;
-  if(!shouldBeOpen){
+  const runtime=health(status,now);
+  response.open=runtime.scheduledOpen;
+  if(!runtime.scheduledOpen){
    response.count=null;response.level='closed';response.label='CLOSED';
    response.forecast=null;response.trend='closed';
   }
@@ -109,11 +110,9 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   const activeVersion=response.forecast?.modelVersion||'v3-recount-provisional';
   response.forecastAccuracy=scored?.model===activeVersion?scored:null;
   response.recounts=R.groupDrops(response.todayHistory||[]);
-  const age=(Date.now()-Date.parse(status.sourceUpdated||''))/60000;
   // Display a warning if source readings are old. Never silently claim LIVE.
-  response.sourceAgeMinutes=Number.isFinite(age)?Math.round(age):null;
-  response.dataState=!shouldBeOpen?'closed':(status.open&&Number.isFinite(age)&&age<=3&&!status.error?'live':
-   (Number.isFinite(age)&&age<=30?'delayed':'offline'));
+  response.sourceAgeMinutes=runtime.sourceAgeMinutes;
+  response.dataState=runtime.state;
   response.fresh=response.dataState==='live';
   response.lastSourceErrorAt=status.sourceErrorAt||null;
   response.sourceHealth=status.error?'fetch_failed':'ok';
@@ -126,7 +125,7 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   response.bestTimes=L.best(weekly,new Date(),response.dataState==='live'?status.forecast:null,status.sourceUpdated);
   if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';response.trendArrow=null;}
   if(response.dataState==='delayed')response.warning='Source reading delayed; last known count only.';
-  if(shouldBeOpen&&!status.open)response.warning='Collector has not reported an open-hours reading. Displaying stale data status.';
+  if(runtime.scheduledOpen&&!status.open)response.warning='Collector has not reported an open-hours reading. Displaying stale data status.';
   if(response.dataState==='offline')response.warning='Source unavailable; last known count is not reliable.';
   if(status.error&&response.dataState!=='closed')response.warning=(response.warning||'')+' Last collection error: '+String(status.error).slice(0,160);
   res.set('Cache-Control','no-store');
@@ -155,9 +154,10 @@ exports.getHistory=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
    const model=await SEASONAL.get();
    const trained=model.exists?model.data():null;
    const season=trained?.seasonal;
-   if(season?.days>=3&&season.recounts>=6){
-    response=S.futureDay(date,season);
-   }else{
+   if(season?.days>=3&&season.recounts>=6)response=S.futureDay(date,season);
+   // A trained model can have no supported observations for a particular
+   // weekday/hour; in that case preserve the historical source-based fallback.
+   if(!response?.points?.length){
     const lower=new Date(Date.parse(date+'T12:00:00Z')-60*86400000).toISOString().slice(0,10);
     const summaries=await db.collection('dailySummaries').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
     let records=summaries.docs.map(d=>({...d.data(),date:d.id}));
