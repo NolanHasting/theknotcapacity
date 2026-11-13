@@ -29,6 +29,9 @@ jobs:
           npm test --prefix functions
           node --check functions/index.js
           node --check functions/history.js
+          node --check functions/seasonal.js
+          node --check functions/logic.js
+          node --check tests/seasonal.test.js
           node --check functions/analytics.js
           node --check functions/recounts.js
           node --check public/app.js
@@ -63,29 +66,5 @@ jobs:
             echo "Runtime account: \`theknotcapacity@appspot.gserviceaccount.com\`"
             echo "If deployment fails with iam.serviceAccounts.actAs, grant **Service Account User** to the deployer on the runtime account in Google Cloud IAM, then rerun this workflow."
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Retire only the three legacy planner Cloud Functions
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Explicit names avoid --force deleting unrelated Cloud Functions.
-          firebase functions:list --project theknotcapacity --json > "$RUNNER_TEMP/functions-list.json"
-          node - "$RUNNER_TEMP/functions-list.json" > "$RUNNER_TEMP/planner-functions.txt" <<'NODE'
-          const fs=require('node:fs');
-          const payload=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
-          if(payload.status==='error')throw Error('Unable to inspect deployed functions');
-          const rows=Array.isArray(payload.result)?payload.result:
-            Array.isArray(payload.result?.functions)?payload.result.functions:null;
-          if(!rows)throw Error('Unexpected firebase functions:list format');
-          const retired=new Set(['plannerApi','evaluatePlannerAlerts','refreshKnotEvents']);
-          for(const row of rows){
-            const id=String(row.id||row.name||'').split('/').pop();
-            if(retired.has(id))process.stdout.write(id+'\n');
-          }
-          NODE
-          while IFS= read -r function_name; do
-            [ -n "$function_name" ] || continue
-            echo "Removing retired planner function: $function_name"
-            firebase functions:delete "$function_name" --project theknotcapacity --region us-east1 --force
-          done < "$RUNNER_TEMP/planner-functions.txt"
       - name: Deploy Hosting and Cloud Functions
         run: firebase deploy --project theknotcapacity --only functions,hosting --non-interactive
