@@ -139,24 +139,6 @@ function renderBest(items){
  $('bestQuick').textContent=top?hourLabel(top.hour).replace(':00',''):'—';
  $('bestQuickNote').textContent=top?(top.source==='forecast'?'Forecast: '+top.average:'Past avg: '+top.average)+' people':'Not enough history yet';
 }
-function insightDetails(d,live){
- const items=[];
- if(live&&Number.isFinite(d.count)){
-  if(Number.isFinite(d.typicalNow)&&d.typicalDays>=2){
-   const difference=d.count-d.typicalNow;
-   items.push({title:'COMPARED WITH USUAL',value:(difference>0?'+':'')+difference+' people',detail:difference>5?'Busier than usual':difference< -5?'Quieter than usual':'About normal'});
-  }else items.push({title:'COMPARED WITH USUAL',value:'—',detail:'Need more matching weekdays'});
-  const accuracy=d.forecastAccuracy?.horizons?.[30];
-  if(accuracy&&accuracy.samples>=20&&Number.isFinite(accuracy.sourceMAE)){
-   items.push({title:'30-MIN FORECAST ERROR',value:'±'+Math.round(accuracy.sourceMAE),detail:'Mean absolute error vs. reported counts · '+accuracy.samples+' checks · '+d.forecastAccuracy.model+' · '+d.forecastAccuracy.date});
-  }else{
-   items.push({title:'FORECAST TRACK RECORD',value:'Collecting',detail:'Scoring forecasts against later counts'});
-  }
-  const best=(d.bestTimes||[])[0];
-  if(best)items.push({title:'QUIETER LATER',value:hourLabel(best.hour),detail:(best.source==='forecast'?'Forecast: ':'Past average: ')+best.average+' people · '+(best.days>=2?best.days+' matching days':'Limited history')});
- }else items.push({title:'CURRENT STATUS',value:(d.dataState||'offline').toUpperCase(),detail:'Live comparisons unavailable'});
- $('insightDetails').innerHTML=items.map(x=>'<div class="insight-item"><div class="eyebrow">'+esc(x.title)+'</div><strong>'+esc(x.value)+'</strong><small>'+esc(x.detail)+'</small></div>').join('');
-}
 function render(d){
  lastData=d;
  const state=d.dataState||'offline',live=state==='live',delayed=state==='delayed',closed=state==='closed';
@@ -180,9 +162,6 @@ function render(d){
  $('next').textContent=live&&d.forecast?d.forecast.projected:'—';
  $('nextNote').textContent=live&&d.forecast?'Estimated in '+Math.min(60,d.forecast.horizonMinutes)+' min':'Not available';
  
- $('insight').textContent=d.warning||(!live?'Current crowd data is unavailable.':'The main number is reported by The Knot. Drops may be staff recounts; future counts are estimates.');
- insightDetails(d,live);
- $('logged').textContent='Updated '+time(d.lastLogged);
  dayChart(d);renderHeat(d.heatmap);renderBest(d.bestTimes);
 }
 function errorState(message){
@@ -192,8 +171,6 @@ function errorState(message){
  $('open').textContent='DATA UNAVAILABLE';$('trend').textContent='—';$('fill').style.width='0%';
  $('rate').textContent='—';$('rateNote').textContent='Unavailable';$('next').textContent='—';$('usual').textContent='—';$('bestQuick').textContent='—';$('bestQuickNote').textContent='Unavailable';$('usualNote').textContent='—';$('nextNote').textContent='Unavailable';
  $('updated').textContent='—';$('capacity').textContent='—';
- $('insight').textContent='Current occupancy is unavailable.';
- $('insightDetails').innerHTML='';
  $('dayNote').textContent='Data unavailable.';clearChart('Unable to load counts.');
  $('besttimes').innerHTML='<div class="fine">No current recommendations.</div>';
  $('heatmap').innerHTML='';
