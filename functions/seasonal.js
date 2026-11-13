@@ -31,7 +31,7 @@ function train(docs,now=new Date()){
  for(let dow=0;dow<7;dow++){
   profiles[dow]=[];
   for(let minute=hours[dow][0]*60;minute<hours[dow][1]*60;minute+=SLOT){
-   let sum=0,weightSum=0,used=0,squares=0;
+   let sum=0,sumSquares=0,weightSum=0,used=0;
    for(const [date,unsorted] of byDay){
     const items=unsorted.slice().sort((a,b)=>a.minute-b.minute);
     const same=items[0].weekday===dow;
@@ -52,16 +52,12 @@ function train(docs,now=new Date()){
     const age=utcDay(asOf)-utcDay(date);
     const weight=(same?2.4:.65)*Math.pow(.5,age/HALF_LIFE_DAYS)*
       Math.max(.2,normalKernel(closest,100));
-    sum+=weight*daily;weightSum+=weight;used++;
+    sum+=weight*daily;sumSquares+=weight*daily*daily;weightSum+=weight;used++;
    }
    const value=weightSum?sum/weightSum:null;
-   if(value!==null)for(const [date,items] of byDay){
-    let nearest=null,closest=Infinity;
-    for(const a of items){const distance=Math.abs(a.minute-minute);if(distance<closest){closest=distance;nearest=a;}}
-    if(nearest&&closest<=60)squares+=(nearest.count-value)**2;
-   }
+   const variance=value!==null&&used>=2?Math.max(0,sumSquares/weightSum-(sum/weightSum)**2):null;
    profiles[dow].push({minute,count:value===null?null:Math.round(Math.max(0,value)),
-    days:used,spread:used>=2?Math.sqrt(squares/used):null});
+    days:used,spread:variance===null?null:Math.sqrt(variance)});
   }
  }
  // Report training support explicitly; never imply a trained weekday curve
@@ -133,14 +129,15 @@ function project(count,trend,seasonal,now,calibration=null){
    low:Math.max(0,Math.round(countEstimate-width)),high:Math.round(countEstimate+width)});
  }
  const hour=predictions.find(x=>x.minutes===60)||predictions.find(x=>x.minutes>60)||predictions.at(-1);
- const calibrated=[15,30,60].every(n=>calibration?.horizons?.[n]?.days>=4&&calibration?.horizons?.[n]?.samples>=25);
+ const requested=[15,30,60,120,240,480].filter(n=>n<=remaining);
+ const calibrated=requested.length>0&&requested.every(n=>calibration?.horizons?.[n]?.days>=4&&calibration?.horizons?.[n]?.samples>=25);
  return {current:count,estimatedStart:count,projected:hour.count,change:hour.count-count,
   closing:predictions.at(-1).count,points:predictions,horizonMinutes:remaining,
   confidence:support>=4?'DEVELOPING':'EARLY',matchingDays:support,
   method:'Live reported count + staff-recount historical profile',
-  intervalType:calibrated?'recount-calibrated-80':'illustrative',
+  intervalType:calibrated?'recount-calibrated-80':'partly-calibrated-or-provisional',
   disclaimer:calibrated?'Shaded band uses historical recount forecast errors. Coverage may vary with time of day.':
-    'Shaded band is provisional until more independent recounts are available. Closing zero is assumed.'};
+    'Shaded band uses available recount errors where possible; remaining ranges are provisional. Zero at close is assumed.'};
 }
 function backtest(docs,now=new Date()){
  const rows=(docs||[]).filter(d=>Array.isArray(d?.points)).sort((a,b)=>a.date.localeCompare(b.date));
