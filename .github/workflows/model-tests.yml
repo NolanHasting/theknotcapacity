@@ -28,6 +28,8 @@ jobs:
           node --check functions/history.js
           node --check functions/analytics.js
           node --check functions/seasonal.js
+          node --check functions/health.js
+          node --check tests/reliability.test.js
           node --check tests/seasonal.test.js
           node --check functions/recounts.js
           node --check public/app.js
