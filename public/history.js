@@ -69,7 +69,7 @@
   if(!isFuture){
    for(let i=0;i<source.length;i+=Math.max(1,Math.ceil(source.length/130))){
     const p=source[i];
-    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="5" fill="transparent" stroke="none" tabindex="0" role="button" data-info="'+safe(tick(p.minute)+': '+p.count+' reported')+'"/>';
+    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="'+(mobile?10:5)+'" fill="transparent" stroke="none" tabindex="0" role="button" data-info="'+safe(tick(p.minute)+': '+p.count+' reported')+'"/>';
    }
   }
   if(!isFuture){
@@ -78,13 +78,13 @@
     const mx=x(localMinute(event.timestamp)),my=y(event.count);
     const info='Staff recount · '+tick(localMinute(event.timestamp))+' · '+event.count+' reported · down '+event.drop;
     html+='<path d="M'+mx+' '+(my-6)+' l6 6 -6 6 -6 -6 Z" fill="#9FD39B" stroke="#111" stroke-width="1.5"><title>'+safe(info)+'</title></path>';
-    html+='<circle class="chart-point" cx="'+mx+'" cy="'+my+'" r="10" fill="transparent" tabindex="0" role="button" aria-label="'+safe(info)+'" data-info="'+safe(info)+'"/>';
+    html+='<circle class="chart-point" cx="'+mx+'" cy="'+my+'" r="'+(mobile?12:10)+'" fill="transparent" tabindex="0" role="button" aria-label="'+safe(info)+'" data-info="'+safe(info)+'"/>';
    }
   }
   if(isFuture){
    for(const p of observed){
     const info=tick(p.minute)+': '+p.count+(p.assumedClose?' assumed at close':' predicted')+' · '+p.days+' supporting day(s)';
-    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="4.2" fill="#f0c468" tabindex="0" role="button" data-info="'+safe(info)+'"><title>'+safe(info)+'</title></circle>';
+    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="'+(mobile?5.5:4.2)+'" fill="#f0c468" tabindex="0" role="button" data-info="'+safe(info)+'"><title>'+safe(info)+'</title></circle>';
    }
   }
   svg.innerHTML=html;
