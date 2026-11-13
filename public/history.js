@@ -2,6 +2,8 @@
 (()=>{
  const el=id=>document.getElementById(id);
  const input=el('historyDate'),summary=el('historySummary'),legend=el('historyLegend'),svg=el('historyChart'),note=el('historyNote');
+ let lastGraph=null;
+ const mobileLayout=window.matchMedia('(max-width: 600px)');
  const zone='America/New_York',parts=new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
  const dayFmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'long',month:'long',day:'numeric',year:'numeric'});
  const localDay=(d)=>{
@@ -15,22 +17,25 @@
  const tick=m=>{let h=Math.floor(m/60);return (h%12||12)+(m%60?':'+String(m%60).padStart(2,'0'):'')+(h<12?' AM':' PM');};
  const safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function graph(data){
+  lastGraph=data;
+  const mobile=mobileLayout.matches;
+  svg.setAttribute('viewBox',mobile?'0 0 360 245':'0 0 760 285');
   const isFuture=data.mode==='future',source=isFuture?data.points:data.points.map(p=>({...p,minute:localMinute(p.timestamp)}));
   svg.innerHTML='';
   if(!source.length){svg.innerHTML='<text x="40" y="155" fill="#aaa">No data for this date.</text>';return;}
   const futureHours=[7,23],minX=7*60,maxX=23*60;
   const observed=source.filter(p=>Number.isFinite(p.count));
   const peak=Math.max(100,...observed.map(p=>Math.max(p.count,p.high||0))),ceiling=Math.ceil(peak/25)*25;
-  const left=45,right=743,top=20,bottom=246;
+  const left=mobile?37:45,right=mobile?350:743,top=20,bottom=mobile?204:246;
   const x=m=>left+(m-minX)/(maxX-minX)*(right-left);
   const y=v=>bottom-v/ceiling*(bottom-top);
   let html='';
   for(let i=0;i<=5;i++){
    const n=ceiling*i/5,yy=y(n);
-   html+='<line x1="'+left+'" x2="'+right+'" y1="'+yy+'" y2="'+yy+'" stroke="#292929"/><text x="37" y="'+(yy+4)+'" text-anchor="end" fill="#aaa" font-size="11">'+Math.round(n)+'</text>';
+   html+='<line x1="'+left+'" x2="'+right+'" y1="'+yy+'" y2="'+yy+'" stroke="#292929"/><text x="'+(left-7)+'" y="'+(yy+4)+'" text-anchor="end" fill="#aaa" font-size="11">'+Math.round(n)+'</text>';
   }
-  for(let h=7;h<=23;h+=2){
-   html+='<text x="'+x(h*60)+'" y="268" text-anchor="middle" fill="#aaa" font-size="10">'+safe(tick(h*60))+'</text>';
+  for(let h=7;h<=23;h+=mobile?4:2){
+   html+='<text x="'+x(h*60)+'" y="'+(mobile?230:268)+'" text-anchor="middle" fill="#aaa" font-size="'+(mobile?11:10)+'">'+safe(tick(h*60))+'</text>';
   }
   let path='',prev=null;
   for(const p of source){
@@ -111,6 +116,7 @@
  };
  input.min=addDays(-120);input.max=addDays(30);input.value=iso;
  input.addEventListener('change',load);
+ mobileLayout.addEventListener('change',()=>{if(lastGraph)graph(lastGraph);});
  el('historyToday').onclick=()=>{input.value=localDay(new Date());load();};
  el('historyTomorrow').onclick=()=>{input.value=addFrom(localDay(new Date()),1);load();};
  function showPoint(e){
