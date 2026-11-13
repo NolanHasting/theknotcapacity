@@ -22,7 +22,7 @@
 <div class="section-title"><h2>Today</h2></div>
 <section class="charts combined">
 <article class="panel"><div class="charthead"><h3>Crowd level through closing</h3><span id="forecastType">REPORTED + FORECAST</span></div>
-<div class="chart-scroll" role="region" aria-label="Scrollable occupancy timeline"><svg class="chart" id="dayChart" viewBox="0 0 600 250" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Today's source readings and expected occupancy through closing"></svg></div>
+<div class="chart-scroll" role="region" aria-label="Occupancy timeline"><svg class="chart" id="dayChart" viewBox="0 0 600 250" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Today's source readings and expected occupancy through closing"></svg></div>
 <div class="chartnote" id="dayNote">Waiting for readings.</div><div class="graph-selection" id="daySelection" aria-live="polite">Tap or focus a point to see the count.</div>
 <div class="legend"><span><i></i>Reported</span><span><i class="forecast"></i>Forecast</span><span><i class="band"></i>Estimated range</span><span><i class="recount"></i>Staff recount</span></div></article>
 </section>
@@ -37,7 +37,7 @@
   <div class="eyebrow" id="historyLegend">OBSERVED DATA</div>
  </div>
  <div id="historySummary" class="history-summary" aria-live="polite">Loading history…</div>
- <div class="chart-scroll" role="region" aria-label="Scroll to view selected occupancy history">
+ <div class="chart-scroll" role="region" aria-label="Selected occupancy history">
   <svg id="historyChart" class="chart history-chart" viewBox="0 0 760 285" role="img" aria-label="Selected day's observed or projected occupancy by time of day"></svg>
  </div>
  <div class="graph-selection" id="historySelection" aria-live="polite">Tap or focus a point to see the count.</div>
@@ -45,7 +45,7 @@
 </section>
 <div class="tabs"><button class="tab active" data-tab="insights">Insights</button><button class="tab" data-tab="patterns">Weekly patterns</button><button class="tab" data-tab="best">Best times</button></div>
 <section class="view active" id="insights"><article class="panel"><div class="eyebrow">CURRENT CONDITIONS</div><p class="insight" id="insight">Checking the current crowd.</p><div class="insight-grid" id="insightDetails"></div><p class="fine" id="logged">Last updated —</p></article></section>
-<section class="view" id="patterns"><article class="panel"><div class="charthead"><h3>Average crowd by day and hour</h3><span>HISTORICAL</span></div><p class="fine">Averages from previous days. Tap a square for details.</p><div class="heat" id="heatmap"></div><div class="heat-scale" aria-label="Occupancy color scale from zero to 100 plus people"><span>0 · QUIETER</span><div class="heat-gradient"></div><span>100+ · BUSIER</span></div><p class="fine">Gray means no data.</p></article></section>
+<section class="view" id="patterns"><article class="panel"><div class="charthead"><h3>Average crowd by day and hour</h3><span>HISTORICAL</span></div><p class="fine">Select a day and hour to see its average crowd.</p><div id="heatDetail" class="heat-detail" role="status" aria-live="polite">Tap or hover over a square to see the average occupancy.</div><div class="heat" id="heatmap" role="group" aria-label="Average occupancy by day of week and hour"></div><div class="heat-scale" aria-label="Occupancy color scale from zero to 100 plus people"><span>0 · QUIETER</span><div class="heat-gradient"></div><span>100+ · BUSIER</span></div><p class="fine">Gray means no data.</p></article></section>
 <section class="view" id="best"><article class="panel"><div class="charthead"><h3>Quieter hours later today</h3><span>LIVE FORECAST + HISTORY</span></div><div class="best" id="besttimes"></div></article></section>
 <footer><span>NOLAN HASTING</span><span>Independent Project · Not Affiliated With The Knot</span></footer>
 </main><script defer src="/app.js"></script><script defer src="/history.js"></script></body></html>

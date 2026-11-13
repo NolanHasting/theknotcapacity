@@ -2,6 +2,8 @@
 (()=>{
  const el=id=>document.getElementById(id);
  const input=el('historyDate'),summary=el('historySummary'),legend=el('historyLegend'),svg=el('historyChart'),note=el('historyNote');
+ let lastGraph=null;
+ const mobileLayout=window.matchMedia('(max-width: 600px)');
  const zone='America/New_York',parts=new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
  const dayFmt=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'long',month:'long',day:'numeric',year:'numeric'});
  const localDay=(d)=>{
@@ -15,22 +17,25 @@
  const tick=m=>{let h=Math.floor(m/60);return (h%12||12)+(m%60?':'+String(m%60).padStart(2,'0'):'')+(h<12?' AM':' PM');};
  const safe=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function graph(data){
+  lastGraph=data;
+  const mobile=mobileLayout.matches;
+  svg.setAttribute('viewBox',mobile?'0 0 360 245':'0 0 760 285');
   const isFuture=data.mode==='future',source=isFuture?data.points:data.points.map(p=>({...p,minute:localMinute(p.timestamp)}));
   svg.innerHTML='';
   if(!source.length){svg.innerHTML='<text x="40" y="155" fill="#aaa">No data for this date.</text>';return;}
   const futureHours=[7,23],minX=7*60,maxX=23*60;
   const observed=source.filter(p=>Number.isFinite(p.count));
   const peak=Math.max(100,...observed.map(p=>Math.max(p.count,p.high||0))),ceiling=Math.ceil(peak/25)*25;
-  const left=45,right=743,top=20,bottom=246;
+  const left=mobile?37:45,right=mobile?350:743,top=20,bottom=mobile?204:246;
   const x=m=>left+(m-minX)/(maxX-minX)*(right-left);
   const y=v=>bottom-v/ceiling*(bottom-top);
   let html='';
   for(let i=0;i<=5;i++){
    const n=ceiling*i/5,yy=y(n);
-   html+='<line x1="'+left+'" x2="'+right+'" y1="'+yy+'" y2="'+yy+'" stroke="#292929"/><text x="37" y="'+(yy+4)+'" text-anchor="end" fill="#aaa" font-size="11">'+Math.round(n)+'</text>';
+   html+='<line x1="'+left+'" x2="'+right+'" y1="'+yy+'" y2="'+yy+'" stroke="#292929"/><text x="'+(left-7)+'" y="'+(yy+4)+'" text-anchor="end" fill="#aaa" font-size="11">'+Math.round(n)+'</text>';
   }
-  for(let h=7;h<=23;h+=2){
-   html+='<text x="'+x(h*60)+'" y="268" text-anchor="middle" fill="#aaa" font-size="10">'+safe(tick(h*60))+'</text>';
+  for(let h=7;h<=23;h+=mobile?4:2){
+   html+='<text x="'+x(h*60)+'" y="'+(mobile?230:268)+'" text-anchor="middle" fill="#aaa" font-size="'+(mobile?11:10)+'">'+safe(tick(h*60))+'</text>';
   }
   let path='',prev=null;
   for(const p of source){
@@ -64,7 +69,7 @@
   if(!isFuture){
    for(let i=0;i<source.length;i+=Math.max(1,Math.ceil(source.length/130))){
     const p=source[i];
-    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="5" fill="transparent" stroke="none" tabindex="0" role="button" data-info="'+safe(tick(p.minute)+': '+p.count+' reported')+'"/>';
+    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="'+(mobile?10:5)+'" fill="transparent" stroke="none" tabindex="0" role="button" data-info="'+safe(tick(p.minute)+': '+p.count+' reported')+'"/>';
    }
   }
   if(!isFuture){
@@ -73,13 +78,13 @@
     const mx=x(localMinute(event.timestamp)),my=y(event.count);
     const info='Staff recount · '+tick(localMinute(event.timestamp))+' · '+event.count+' reported · down '+event.drop;
     html+='<path d="M'+mx+' '+(my-6)+' l6 6 -6 6 -6 -6 Z" fill="#9FD39B" stroke="#111" stroke-width="1.5"><title>'+safe(info)+'</title></path>';
-    html+='<circle class="chart-point" cx="'+mx+'" cy="'+my+'" r="10" fill="transparent" tabindex="0" role="button" aria-label="'+safe(info)+'" data-info="'+safe(info)+'"/>';
+    html+='<circle class="chart-point" cx="'+mx+'" cy="'+my+'" r="'+(mobile?12:10)+'" fill="transparent" tabindex="0" role="button" aria-label="'+safe(info)+'" data-info="'+safe(info)+'"/>';
    }
   }
   if(isFuture){
    for(const p of observed){
     const info=tick(p.minute)+': '+p.count+(p.assumedClose?' assumed at close':' predicted')+' · '+p.days+' supporting day(s)';
-    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="4.2" fill="#f0c468" tabindex="0" role="button" data-info="'+safe(info)+'"><title>'+safe(info)+'</title></circle>';
+    html+='<circle class="chart-point" cx="'+x(p.minute)+'" cy="'+y(p.count)+'" r="'+(mobile?5.5:4.2)+'" fill="#f0c468" tabindex="0" role="button" data-info="'+safe(info)+'"><title>'+safe(info)+'</title></circle>';
    }
   }
   svg.innerHTML=html;
@@ -111,6 +116,7 @@
  };
  input.min=addDays(-120);input.max=addDays(30);input.value=iso;
  input.addEventListener('change',load);
+ mobileLayout.addEventListener('change',()=>{if(lastGraph)graph(lastGraph);});
  el('historyToday').onclick=()=>{input.value=localDay(new Date());load();};
  el('historyTomorrow').onclick=()=>{input.value=addFrom(localDay(new Date()),1);load();};
  function showPoint(e){
