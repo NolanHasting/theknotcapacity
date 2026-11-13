@@ -57,7 +57,7 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
   const model=modelSnap.exists?modelSnap.data():null;
   // Staff recounts provide calibration labels; raw drop sizes are NOT departures.
   // Keep current source count as the visible, continuous anchor of the chart.
-  const projection=model?.seasonal?.recounts>=2?
+  const projection=model?.seasonal?.days>=3&&model.seasonal.recounts>=6?
    S.project(count,rate,model.seasonal,now,model.calibration):
    L.forecast(count,rate,nextWeekly,now,null);
   const sample={timestamp:now.toISOString(),count};
@@ -93,16 +93,26 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
  if(req.method!=='GET'){res.status(405).json({ok:false,error:'GET only'});return;}
  try{
   const p=L.parts(new Date());
+  const shouldBeOpen=L.openNow(p);
   const [s,d,w,a]=await Promise.all([STATUS.get(),db.collection('days').doc(p.day).get(),WEEKLY.get(),db.collection('system').doc('forecastAccuracy').get()]);
   if(!s.exists){res.status(503).set('Cache-Control','no-store').json({ok:false,error:'No reading exists yet. Check that collectOccupancy is deployed, enabled, and running in Firebase Scheduler.'});return;}
   const status=s.data(),weekly=w.exists?w.data():{};
   let response=L.summarize(status,d.exists?d.data():{},weekly);
-  response.forecastAccuracy=a.exists?a.data():null;
+  // Schedule and collection health are independent. A failed opening/closing
+  // collector must never make yesterday's CLOSED/OPEN state look current.
+  response.open=shouldBeOpen;
+  if(!shouldBeOpen){
+   response.count=null;response.level='closed';response.label='CLOSED';
+   response.forecast=null;response.trend='closed';
+  }
+  const scored=a.exists?a.data():null;
+  const activeVersion=response.forecast?.modelVersion||'v3-recount-provisional';
+  response.forecastAccuracy=scored?.model===activeVersion?scored:null;
   response.recounts=R.groupDrops(response.todayHistory||[]);
   const age=(Date.now()-Date.parse(status.sourceUpdated||''))/60000;
   // Display a warning if source readings are old. Never silently claim LIVE.
   response.sourceAgeMinutes=Number.isFinite(age)?Math.round(age):null;
-  response.dataState=!response.open?'closed':(Number.isFinite(age)&&age<=3&&!status.error?'live':
+  response.dataState=!shouldBeOpen?'closed':(status.open&&Number.isFinite(age)&&age<=3&&!status.error?'live':
    (Number.isFinite(age)&&age<=30?'delayed':'offline'));
   response.fresh=response.dataState==='live';
   response.lastSourceErrorAt=status.sourceErrorAt||null;
@@ -116,6 +126,7 @@ exports.getOccupancy=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
   response.bestTimes=L.best(weekly,new Date(),response.dataState==='live'?status.forecast:null,status.sourceUpdated);
   if(response.dataState!=='live'){response.forecast=null;response.trendPer30=null;response.trendLabel='DATA NOT LIVE';response.trendArrow=null;}
   if(response.dataState==='delayed')response.warning='Source reading delayed; last known count only.';
+  if(shouldBeOpen&&!status.open)response.warning='Collector has not reported an open-hours reading. Displaying stale data status.';
   if(response.dataState==='offline')response.warning='Source unavailable; last known count is not reliable.';
   if(status.error&&response.dataState!=='closed')response.warning=(response.warning||'')+' Last collection error: '+String(status.error).slice(0,160);
   res.set('Cache-Control','no-store');
@@ -141,17 +152,21 @@ exports.getHistory=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
    const doc=await db.collection('days').doc(date).get();
    response=H.historical(doc.exists?doc.data():{points:[]},date);
   }else{
-   const lower=new Date(Date.parse(date+'T12:00:00Z')-60*86400000).toISOString().slice(0,10);
-   const summaries=await db.collection('dailySummaries').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
-   let records=summaries.docs.map(d=>({...d.data(),date:d.id}));
-   // Transitional fallback while historical daily summaries are being built.
-   if(records.length<3){
-    const old=await db.collection('days').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
-    records=old.docs.map(d=>({...d.data(),date:d.id}));
-   }
    const model=await SEASONAL.get();
    const trained=model.exists?model.data():null;
-   response=trained?.seasonal?.recounts>=2?S.futureDay(date,trained.seasonal):H.future(date,records);
+   const season=trained?.seasonal;
+   if(season?.days>=3&&season.recounts>=6){
+    response=S.futureDay(date,season);
+   }else{
+    const lower=new Date(Date.parse(date+'T12:00:00Z')-60*86400000).toISOString().slice(0,10);
+    const summaries=await db.collection('dailySummaries').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
+    let records=summaries.docs.map(d=>({...d.data(),date:d.id}));
+    if(records.length<3){
+     const old=await db.collection('days').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
+     records=old.docs.map(d=>({...d.data(),date:d.id}));
+    }
+    response=H.future(date,records);
+   }
   }
   res.json({ok:true,...response});
  }catch(err){
