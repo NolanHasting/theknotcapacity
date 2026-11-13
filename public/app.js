@@ -56,17 +56,17 @@ function dayChart(d){
  const markers=[];
  for(let i=0;i<history.length;i+=Math.max(1,Math.ceil(history.length/110))){
   const p=history[i],label=time(p.timestamp)+': '+p.count+' reported';
-  markers.push('<circle class="chart-point" cx="'+x(Date.parse(p.timestamp)).toFixed(2)+'" cy="'+y(p.count).toFixed(2)+'" r="5" fill="transparent" tabindex="0" role="button" data-info="'+esc(label)+'"/>');
+  markers.push('<circle class="chart-point" cx="'+x(Date.parse(p.timestamp)).toFixed(2)+'" cy="'+y(p.count).toFixed(2)+'" r="'+(mobile?11:5)+'" fill="transparent" tabindex="0" role="button" data-info="'+esc(label)+'"/>');
  }
  for(const p of projected){
   if(!Number.isFinite(p.count))continue;
   const label=time(new Date(p.ts).toISOString())+': '+p.count+' forecast · possible '+p.low+'–'+p.high;
-  markers.push('<circle class="chart-point" cx="'+x(p.ts).toFixed(2)+'" cy="'+y(p.count).toFixed(2)+'" r="5.5" fill="transparent" tabindex="0" role="button" data-info="'+esc(label)+'"/>');
+  markers.push('<circle class="chart-point" cx="'+x(p.ts).toFixed(2)+'" cy="'+y(p.count).toFixed(2)+'" r="'+(mobile?11:5.5)+'" fill="transparent" tabindex="0" role="button" data-info="'+esc(label)+'"/>');
  }
  for(const event of (d.recounts||[])){
   if(!Number.isFinite(Date.parse(event.timestamp))||!Number.isFinite(event.count))continue;
   const label='Staff recount · '+time(event.timestamp)+' · '+event.count+' reported · down '+event.drop;
-  markers.push('<circle class="chart-point" cx="'+x(Date.parse(event.timestamp)).toFixed(2)+'" cy="'+y(event.count).toFixed(2)+'" r="9" fill="transparent" tabindex="0" role="button" aria-label="'+esc(label)+'" data-info="'+esc(label)+'"/>');
+  markers.push('<circle class="chart-point" cx="'+x(Date.parse(event.timestamp)).toFixed(2)+'" cy="'+y(event.count).toFixed(2)+'" r="'+(mobile?12:9)+'" fill="transparent" tabindex="0" role="button" aria-label="'+esc(label)+'" data-info="'+esc(label)+'"/>');
  }
  $('dayChart').innerHTML=marks+shapes+markers.join('')+ticks.join('');
  $('forecastType').textContent=forecast?'FORECAST':'REPORTED ONLY';
