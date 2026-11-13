@@ -189,13 +189,16 @@ exports.scoreOccupancyForecasts=onSchedule({schedule:'15 2 * * *',timeZone:L.TZ,
  ]);
  // The event range above is UTC-based. A dated document prefix is more robust
  // around DST and local-day boundaries; filter by local date as a safeguard.
- const snapshots=snaps.docs.map(x=>x.data());
+ const snapshots=snaps.docs.map(x=>x.data()).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
  const recounts=events.docs.map(x=>x.data()).filter(x=>L.parts(new Date(x.timestamp)).day===date);
  const points=raw.exists?raw.data().points||[]:[];
- const scored=A.scoreDay(points,snapshots,recounts);
+ const versions=[...new Set(snapshots.map(s=>s.modelVersion||'v3-recount-provisional'))];
+ const scores=Object.fromEntries(versions.map(v=>[v,A.scoreDay(points,snapshots,recounts,v)]));
+ const active=versions.at(-1)||'v3-recount-provisional';
+ const scored=scores[active]||A.scoreDay(points,[],recounts,active);
  const updated=new Date().toISOString();
  const batch=db.batch();
- batch.set(db.collection('forecastScores').doc(date),{...scored,date,updated});
+ batch.set(db.collection('forecastScores').doc(date),{...scored,byModel:scores,date,updated});
  batch.set(db.collection('system').doc('forecastAccuracy'),{...scored,date,updated});
  await batch.commit();
  logger.info('Scored daily forecasts',{date,snapshots:snapshots.length,observations:points.length});
