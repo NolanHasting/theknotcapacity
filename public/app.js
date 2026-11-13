@@ -18,12 +18,15 @@ function dayChart(d){
  const maxTs=projected.length?Math.max(lastTs,projected[projected.length-1].ts):lastTs;
  const span=Math.max(60000,maxTs-start);
  const all=[...history.map(p=>p.count),...projected.map(p=>p.high)];
- const yMax=Math.max(25,Math.ceil(Math.max(100,...all)/10)*10),left=44,right=588,top=19,bottom=206;
+ const mobile=window.matchMedia('(max-width: 600px)').matches;
+ const width=mobile?360:600,height=mobile?234:250;
+ $('dayChart').setAttribute('viewBox','0 0 '+width+' '+height);
+ const yMax=Math.max(25,Math.ceil(Math.max(100,...all)/10)*10),left=mobile?38:44,right=mobile?352:588,top=19,bottom=mobile?192:206;
  const x=t=>left+(t-start)/span*(right-left),y=n=>bottom-n/yMax*(bottom-top);
  let marks='';for(let i=0;i<=4;i++){
   const v=Math.round(yMax*i/4),yy=y(v);
   marks+=svg('line',`x1="${left}" y1="${yy.toFixed(1)}" x2="${right}" y2="${yy.toFixed(1)}" stroke="#333"`);
-  marks+=`<text x="37" y="${(yy+4).toFixed(1)}" text-anchor="end" fill="#bfbfbf" font-size="10">${v}</text>`;
+  marks+=`<text x="${left-7}" y="${(yy+4).toFixed(1)}" text-anchor="end" fill="#bfbfbf" font-size="${mobile?11:10}">${v}</text>`;
  }
  const historyLine=history.map((p,i)=>((i&&Date.parse(p.timestamp)-Date.parse(history[i-1].timestamp)<=10*60000)?'L':'M')+x(Date.parse(p.timestamp)).toFixed(2)+' '+y(p.count).toFixed(2)).join(' ');
  let shapes=`<path d="${historyLine}" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -45,9 +48,9 @@ function dayChart(d){
   const divider=x(nowTs);shapes+=svg('line',`x1="${divider.toFixed(2)}" y1="${top}" x2="${divider.toFixed(2)}" y2="${bottom}" stroke="#999" stroke-dasharray="3 6"`);
   shapes+=`<text x="${Math.min(right-7,divider+6).toFixed(2)}" y="13" fill="#fff" font-size="10" text-anchor="${divider>right-65?'end':'start'}">NOW</text>`;
  }
- const ticks=[];for(let i=0;i<5;i++){
-  const ts=start+span*i/4;
-  ticks.push(`<text x="${(left+(right-left)*i/4).toFixed(1)}" y="232" fill="#bfbfbf" font-size="10" text-anchor="${i===0?'start':i===4?'end':'middle'}">${esc(time(new Date(ts).toISOString()))}</text>`);
+ const ticks=[],tickCount=mobile?3:5;for(let i=0;i<tickCount;i++){
+  const ts=start+span*i/(tickCount-1);
+  ticks.push(`<text x="${(left+(right-left)*i/(tickCount-1)).toFixed(1)}" y="${mobile?216:232}" fill="#bfbfbf" font-size="${mobile?11:10}" text-anchor="${i===0?'start':i===tickCount-1?'end':'middle'}">${esc(time(new Date(ts).toISOString()))}</text>`);
  }
  // Invisible touch targets keep the chart visually clean, but accessible.
  const markers=[];
@@ -211,6 +214,8 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 refresh();setInterval(refresh,30000);
+const dayLayout=window.matchMedia('(max-width: 600px)');
+dayLayout.addEventListener('change',()=>{if(lastData)dayChart(lastData);});
 
 function showChartPoint(e){
  const point=e.target.closest?.('[data-info]');
