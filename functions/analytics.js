@@ -1,7 +1,6 @@
 'use strict';
 const L=require('./logic');
 const SNAPSHOT_MINUTES=[15,30,60];
-const MIN_COVERAGE=8;
 const toMinute=p=>p.hour*60+p.minute;
 function compactDay(date,points){
  const bins=new Map(),valid=(points||[]).filter(x=>Number.isFinite(x.count)&&x.count>=0&&Number.isFinite(Date.parse(x.timestamp)));
@@ -40,7 +39,7 @@ function snapshot(date,now,count,forecast){
   const p=forecast.points.find(x=>x.minutes===horizon);
   if(p&&Number.isFinite(p.count))at[horizon]={predicted:p.count,low:p.low,high:p.high};
  }
- return {date,createdAt:now.toISOString(),sourceCount:count,modelVersion:'v3-recount-provisional',
+ return {date,createdAt:now.toISOString(),sourceCount:count,modelVersion:forecast.modelVersion||'v3-recount-provisional',
   targetMinutes:at};
 }
 function matchObservation(readings,target,tolerance=5){
@@ -53,14 +52,15 @@ function matchObservation(readings,target,tolerance=5){
  }
  return distance<=tolerance?best:null;
 }
-function scoreDay(readings,snapshots,recountEvents=[]){
+function scoreDay(readings,snapshots,recountEvents=[],requestedModel=null){
  const rows=[...(readings||[])].sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
- const drops=(recountEvents||[]).filter(e=>e.drop>0&&e.verified!==false);
  // Additional weak-label analysis includes *all* candidate recounts.
  const allDrops=(recountEvents||[]).filter(e=>e.drop>0);
  const groups={};
  for(const n of SNAPSHOT_MINUTES)groups[n]={sourceErrors:[],baselineErrors:[],recountErrors:[],bands:0,bandHits:0};
+ const model=requestedModel||snapshots?.at(-1)?.modelVersion||'v3-recount-provisional';
  for(const s of snapshots||[]){
+  if((s.modelVersion||'v3-recount-provisional')!==model)continue;
   const start=Date.parse(s.createdAt);
   if(!Number.isFinite(start))continue;
   for(const n of SNAPSHOT_MINUTES){
@@ -79,10 +79,10 @@ function scoreDay(readings,snapshots,recountEvents=[]){
  }
  const round=n=>Math.round(n*10)/10;
  const avg=a=>a.length?round(a.reduce((x,y)=>x+y,0)/a.length):null;
- return {model:'v3-recount-provisional',horizons:Object.fromEntries(SNAPSHOT_MINUTES.map(n=>{
+ return {model,horizons:Object.fromEntries(SNAPSHOT_MINUTES.map(n=>{
   const g=groups[n];return [n,{samples:g.sourceErrors.length,sourceMAE:avg(g.sourceErrors),
    persistenceMAE:avg(g.baselineErrors),candidateRecountSamples:g.recountErrors.length,
    candidateRecountMAE:avg(g.recountErrors),illustrativeBandCoverage:g.bands?round(100*g.bandHits/g.bands):null}];
  })),explanation:'Source error measures reported counts, not verified occupancy; candidate recount errors are weak labels.'};
 }
-module.exports={compactDay,rebuildQuarter,snapshot,scoreDay,matchObservation,SNAPSHOT_MINUTES,MIN_COVERAGE};
+module.exports={compactDay,rebuildQuarter,snapshot,scoreDay,matchObservation,SNAPSHOT_MINUTES};
