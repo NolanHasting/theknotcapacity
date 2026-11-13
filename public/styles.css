@@ -97,3 +97,13 @@ footer{margin-top:27px;border-top:1px solid var(--line);padding-top:18px;display
  .heat .heat-hour{font-size:8.5px}
 }
 @media(prefers-reduced-motion:reduce){.heat .heat-cell{transition:none}}
+
+/* Crawlable context without pushing the live crowd count below the fold. */
+.seo-heading{padding:15px 1px 12px}
+.seo-heading h1{font-size:clamp(14px,1.5vw,17px);font-weight:700;line-height:1.35;margin:0 0 4px;color:#ebeee9}
+.seo-heading p{font-size:12px;line-height:1.5;color:#aaa;margin:0}
+.tracker-about{border-top:1px solid var(--soft-line);margin-top:34px;padding:27px 2px 7px;max-width:780px}
+.tracker-about h2{font-size:18px;letter-spacing:-.02em;margin:0 0 11px}
+.tracker-about p{font-size:13px;line-height:1.75;color:#bdbdbd;margin:0 0 12px}
+.tracker-about a{color:#c0d7bd;text-decoration:underline;text-underline-offset:2px}
+@media(max-width:600px){.seo-heading{padding:12px 1px 10px}.seo-heading h1{font-size:14px}.seo-heading p{font-size:11px}.tracker-about{margin-top:26px}}
