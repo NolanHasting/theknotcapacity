@@ -32,28 +32,33 @@ function train(docs,now=new Date()){
   profiles[dow]=[];
   for(let minute=hours[dow][0]*60;minute<hours[dow][1]*60;minute+=SLOT){
    let sum=0,weightSum=0,used=0,squares=0;
-   for(const [date,items] of byDay){
+   for(const [date,unsorted] of byDay){
+    const items=unsorted.slice().sort((a,b)=>a.minute-b.minute);
     const same=items[0].weekday===dow;
-    let localSum=0,localWeight=0,closest=Infinity;
-    for(const a of items){
-     const distance=Math.abs(minute-a.minute);
-     closest=Math.min(closest,distance);
-     if(distance>120)continue;
-     const w=normalKernel(distance,55);
-     localSum+=a.count*w;localWeight+=w;
+    let left=null,right=null;
+    for(const a of items){if(a.minute<=minute)left=a;if(a.minute>=minute){right=a;break;}}
+    let daily=null,closest=Infinity;
+    if(left&&right&&right.minute-left.minute<=300){
+     const gap=right.minute-left.minute;
+     const mix=gap?((minute-left.minute)/gap):0;
+     daily=left.count*(1-mix)+right.count*mix;
+     closest=Math.min(minute-left.minute,right.minute-minute);
+    }else{
+     const nearest=items.reduce((best,a)=>!best||Math.abs(a.minute-minute)<Math.abs(best.minute-minute)?a:best,null);
+     if(nearest){closest=Math.abs(minute-nearest.minute);if(closest<=90)daily=nearest.count;}
     }
-    if(!localWeight||closest>90)continue;
-    const daily=localSum/localWeight;
+    if(daily===null)continue;
+    // Days contribute once per slot; don't overweight high-frequency scans.
     const age=utcDay(asOf)-utcDay(date);
     const weight=(same?2.4:.65)*Math.pow(.5,age/HALF_LIFE_DAYS)*
-      normalKernel(closest,90);
+      Math.max(.2,normalKernel(closest,100));
     sum+=weight*daily;weightSum+=weight;used++;
    }
    const value=weightSum?sum/weightSum:null;
    if(value!==null)for(const [date,items] of byDay){
-    let closest=Infinity,nearest=null;
-    for(const a of items){const d=Math.abs(minute-a.minute);if(d<closest){closest=d;nearest=a;}}
-    if(closest<=60&&nearest)squares+=(nearest.count-value)**2;
+    let nearest=null,closest=Infinity;
+    for(const a of items){const distance=Math.abs(a.minute-minute);if(distance<closest){closest=distance;nearest=a;}}
+    if(nearest&&closest<=60)squares+=(nearest.count-value)**2;
    }
    profiles[dow].push({minute,count:value===null?null:Math.round(Math.max(0,value)),
     days:used,spread:used>=2?Math.sqrt(squares/used):null});
