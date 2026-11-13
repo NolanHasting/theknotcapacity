@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://theknotcapacity.web.app/sitemap.xml
+Sitemap: https://climbtheknot.live/sitemap.xml
