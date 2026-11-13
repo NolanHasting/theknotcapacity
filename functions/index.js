@@ -8,6 +8,7 @@ const L=require('./logic');
 const H=require('./history');
 const R=require('./recounts');
 const A=require('./analytics');
+const S=require('./seasonal');
 initializeApp();
 const db=getFirestore();
 const REGION='us-east1';
@@ -17,6 +18,7 @@ const RUNTIME_SERVICE_ACCOUNT='theknotcapacity@appspot.gserviceaccount.com';
 const ENDPOINT='https://climbtheknot.com/api/capacity.json';
 const STATUS=db.collection('system').doc('current');
 const WEEKLY=db.collection('system').doc('weekly');
+const SEASONAL=db.collection('system').doc('seasonalModel');
 
 // One scheduled check per minute. Closed hours do not contact the gym endpoint.
 exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:REGION,
@@ -42,8 +44,8 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
  const minuteId=`${p.day}_${String(p.hour).padStart(2,'0')}${String(p.minute).padStart(2,'0')}`;
  const dayRef=db.collection('days').doc(p.day);
  await db.runTransaction(async tx=>{
-  const [prevSnap,daySnap,weeklySnap]=await Promise.all([
-   tx.get(STATUS),tx.get(dayRef),tx.get(WEEKLY)]);
+  const [prevSnap,daySnap,weeklySnap,modelSnap]=await Promise.all([
+   tx.get(STATUS),tx.get(dayRef),tx.get(WEEKLY),tx.get(SEASONAL)]);
   if(prevSnap.exists&&prevSnap.data().lastMinuteId===minuteId)return; // retry-safe once per minute
   const old=prevSnap.exists?prevSnap.data():{},day=daySnap.exists?daySnap.data():{points:[]};
   const weekly=weeklySnap.exists?weeklySnap.data():{total:0,started:now.toISOString()};
@@ -52,7 +54,12 @@ exports.collectOccupancy=onSchedule({schedule:'* * * * *',timeZone:L.TZ,region:R
   const priorPoint=oldRecent.length?oldRecent[oldRecent.length-1]:null;
   const correction=R.update(old.recountModel||{},priorPoint,count,now);
   const nextWeekly=L.addWeekly(weekly,p,count);
-  const projection=L.forecast(count,rate,nextWeekly,now,correction);
+  const model=modelSnap.exists?modelSnap.data():null;
+  // Staff recounts provide calibration labels; raw drop sizes are NOT departures.
+  // Keep current source count as the visible, continuous anchor of the chart.
+  const projection=model?.seasonal?.recounts>=2?
+   S.project(count,rate,model.seasonal,now,model.calibration):
+   L.forecast(count,rate,nextWeekly,now,null);
   const sample={timestamp:now.toISOString(),count};
   const status={...L.crowd(count,true),open:true,count,trend:direction.key,trendLabel:direction.label,trendArrow:direction.arrow,
    trendPer30:rate,forecast:projection,updated:now.toISOString(),sourceUpdated:now.toISOString(),
@@ -142,7 +149,9 @@ exports.getHistory=onRequest({region:REGION,memory:'256MiB',timeoutSeconds:20,
     const old=await db.collection('days').orderBy(FieldPath.documentId()).startAt(lower).endBefore(date).limit(60).get();
     records=old.docs.map(d=>({...d.data(),date:d.id}));
    }
-   response=H.future(date,records);
+   const model=await SEASONAL.get();
+   const trained=model.exists?model.data():null;
+   response=trained?.seasonal?.recounts>=2?S.futureDay(date,trained.seasonal):H.future(date,records);
   }
   res.json({ok:true,...response});
  }catch(err){
@@ -175,4 +184,22 @@ exports.scoreOccupancyForecasts=onSchedule({schedule:'15 2 * * *',timeZone:L.TZ,
  batch.set(db.collection('system').doc('forecastAccuracy'),{...scored,date,updated});
  await batch.commit();
  logger.info('Scored daily forecasts',{date,snapshots:snapshots.length,observations:points.length});
+});
+
+/**
+ * Retrains once per day using previously completed days. The 60-day horizon
+ * is bounded; no partial current day or future date can leak into training.
+ * Backtests walk forward by full day and score later recount endings.
+ */
+exports.trainSeasonalForecast=onSchedule({schedule:'20 4 * * *',timeZone:L.TZ,
+ region:REGION,memory:'512MiB',timeoutSeconds:240,maxInstances:1,serviceAccount:RUNTIME_SERVICE_ACCOUNT},async()=>{
+ const now=new Date(),today=L.parts(now).day;
+ const lower=new Date(Date.parse(today+'T12:00:00Z')-65*86400000).toISOString().slice(0,10);
+ const dayDocs=await db.collection('days').orderBy(FieldPath.documentId()).startAt(lower).endBefore(today).limit(65).get();
+ const records=dayDocs.docs.map(d=>({...d.data(),date:d.id})).filter(d=>Array.isArray(d.points)&&d.points.length);
+ const seasonal=S.train(records,now);
+ const calibration=S.backtest(records,now);
+ await SEASONAL.set({seasonal,calibration,updatedAt:now.toISOString(),recordDays:records.length});
+ logger.info('Seasonal model trained',{recordDays:records.length,recounts:seasonal.recounts,
+  calibratedHorizons:Object.values(calibration.horizons).filter(x=>x.p80!==null).length});
 });
