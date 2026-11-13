@@ -40,30 +40,14 @@ function future(date,records){
  const same=valid.filter(r=>weekdayOf(r.date)===dow);
  const baseline=same.length>=2?same:valid;
  const basis=same.length>=2?'same weekdays':'recent days';
- // Reconstruct departure rates from successive probable recounts, then adjust
- // historical readings downward between anchor points. If evidence is too
- // sparse, leave the raw readings intact and identify them as source-based.
- const all=valid.flatMap(d=>(d.points||[]).map(p=>({...p})));
- // Daily summary documents contain 15-minute averages, not minute observations.
- const analysis=R.inspect(all);
- const rate=Number.isFinite(analysis.state.departuresPerMinute)&&analysis.state.rateSamples>=2?
-  analysis.state.departuresPerMinute:null;
- const resets=analysis.events.map(v=>Date.parse(v.timestamp));
+ // Legacy fallback uses observed reported counts, never drop size as a
+ // departure rate. Only actual ending recounts are headcount anchors.
  const daily=baseline.map(r=>{
   if(Array.isArray(r.bins)&&r.bins.length){
    return {date:r.date,bins:new Map(r.bins.filter(x=>Number.isFinite(x.minute)&&Number.isFinite(x.count))
     .map(x=>[x.minute,{sum:x.count*samples(x),n:samples(x)}]))};
   }
-  let pointer=0,lastReset=null;
-  const sorted=r.points.slice().sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
-  const adjusted=rate===null?sorted:sorted.map(p=>{
-   const t=Date.parse(p.timestamp);
-   while(pointer<resets.length&&resets[pointer]<=t)lastReset=resets[pointer++];
-   const elapsed=lastReset===null?null:(t-lastReset)/60000;
-   return {...p,count:elapsed!==null&&elapsed>=0&&elapsed<=180?
-    Math.max(0,Math.round(p.count-rate*elapsed)):p.count};
-  });
-  return {date:r.date,bins:dailyBins({date:r.date,points:adjusted})};
+  return {date:r.date,bins:dailyBins({date:r.date,points:r.points||[]})};
  });
  const points=[];
  for(let minute=range[0]*60;minute<range[1]*60;minute+=15){
@@ -80,12 +64,13 @@ function future(date,records){
    }
    return weights>=.55?total/weights:null;
   }).filter(Number.isFinite);
-  let avg=means.length?means.reduce((a,b)=>a+b,0)/means.length:null;
+  const rawAverage=means.length?means.reduce((a,b)=>a+b,0)/means.length:null;
+  let avg=rawAverage;
   if(avg!==null){
    const untilClose=range[1]*60-minute;
    avg=Math.max(0,Math.round(avg*Math.min(1,untilClose/60)));
   }
-  const dispersion=means.length>=2?Math.sqrt(means.reduce((sum,x)=>sum+(x-avg)**2,0)/means.length):null;
+  const dispersion=means.length>=2?Math.sqrt(means.reduce((sum,x)=>sum+(x-rawAverage)**2,0)/means.length):null;
   const elapsed=(minute-range[0]*60)/60;
   const closing=Math.min(1,(range[1]*60-minute)/60);
   const width=avg===null?null:Math.round(Math.max(5,dispersion===null?8:dispersion)*closing+11*Math.sqrt(elapsed)*closing);
@@ -95,7 +80,7 @@ function future(date,records){
  const observed=points.filter(p=>p.count!==null&&!p.assumedClose);
  return {mode:'future',date,points:observed.length?points:[],
   summary:{matchingWeekdays:same.length,referenceDays:baseline.length,coveredSlots:observed.length,totalSlots:range[1]*4-range[0]*4,
-   possibleRecounts:analysis.state.resetCount||0,recountAdjusted:rate!==null},
-  basis,note:observed.length?('Based on '+basis+'. '+(rate===null?'Source-based profile.':'Adjusted from likely recounts.')+' Shaded range is illustrative. Closing is assumed empty.'):'Not enough history for this date.'};
+   possibleRecounts:0,recountAdjusted:false},
+  basis,note:observed.length?('Based on '+basis+'. Source-based historical profile. Shaded range is illustrative. Closing is assumed empty.'):'Not enough history for this date.'};
 }
 module.exports={dateOnly,dailyBins,historical,future};

@@ -70,7 +70,9 @@ function dayChart(d){
  }
  $('dayChart').innerHTML=marks+shapes+markers.join('')+ticks.join('');
  $('forecastType').textContent=forecast?'FORECAST':'REPORTED ONLY';
- $('dayNote').textContent=forecast?'Forecast based on recent counts and past patterns. Range is illustrative; zero at close is assumed.':'Forecast unavailable without live readings.';
+ $('dayNote').textContent=forecast?
+  (forecast.disclaimer||'Forecast is an estimate; closing zero is a schedule assumption.'):
+  'Forecast unavailable without live readings.';
 }
 const HEAT_COLORS=[
  '#123f32','#196047','#257b4d','#40945b',
@@ -146,7 +148,7 @@ function insightDetails(d,live){
   }else items.push({title:'COMPARED WITH USUAL',value:'—',detail:'Need more matching weekdays'});
   const accuracy=d.forecastAccuracy?.horizons?.[30];
   if(accuracy&&accuracy.samples>=20&&Number.isFinite(accuracy.sourceMAE)){
-   items.push({title:'30-MIN FORECAST ERROR',value:'±'+Math.round(accuracy.sourceMAE),detail:'Mean error vs. reported counts · '+accuracy.samples+' checks on '+d.forecastAccuracy.date});
+   items.push({title:'30-MIN FORECAST ERROR',value:'±'+Math.round(accuracy.sourceMAE),detail:'Mean absolute error vs. reported counts · '+accuracy.samples+' checks · '+d.forecastAccuracy.model+' · '+d.forecastAccuracy.date});
   }else{
    items.push({title:'FORECAST TRACK RECORD',value:'Collecting',detail:'Scoring forecasts against later counts'});
   }

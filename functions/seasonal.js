@@ -38,14 +38,14 @@ function train(docs,now=new Date()){
     let left=null,right=null;
     for(const a of items){if(a.minute<=minute)left=a;if(a.minute>=minute){right=a;break;}}
     let daily=null,closest=Infinity;
-    if(left&&right&&right.minute-left.minute<=300){
+    if(left&&right&&right.minute-left.minute<=180){
      const gap=right.minute-left.minute;
      const mix=gap?((minute-left.minute)/gap):0;
      daily=left.count*(1-mix)+right.count*mix;
      closest=Math.min(minute-left.minute,right.minute-minute);
     }else{
      const nearest=items.reduce((best,a)=>!best||Math.abs(a.minute-minute)<Math.abs(best.minute-minute)?a:best,null);
-     if(nearest){closest=Math.abs(minute-nearest.minute);if(closest<=90)daily=nearest.count;}
+     if(nearest){closest=Math.abs(minute-nearest.minute);if(closest<=60)daily=nearest.count;}
     }
     if(daily===null)continue;
     // Days contribute once per slot; don't overweight high-frequency scans.
@@ -80,6 +80,8 @@ function profile(model,p){
   return candidate&&Math.abs(candidate.minute-target)<=15?candidate:null;
  }
  if(left.minute===right.minute)return left;
+ // Do not invent a continuous shape across wide gaps in staff recount support.
+ if(right.minute-left.minute>30)return null;
  const weight=(target-left.minute)/(right.minute-left.minute);
  return {count:left.count*(1-weight)+right.count*weight,
   days:Math.min(left.days,right.days),spread:Math.max(left.spread||0,right.spread||0)};
@@ -97,8 +99,8 @@ function band(calibration,horizon,hasHistory){
  }
  if(before&&after&&before.minute!==after.minute)
   return Math.max(0,before.value+(after.value-before.value)*(horizon-before.minute)/(after.minute-before.minute));
- if(before)return Math.max(before.value,before.value*Math.sqrt(horizon/before.minute));
- if(after)return after.value*Math.sqrt(horizon/after.minute);
+ if(before&&horizon<=before.minute*1.5)return Math.max(before.value,before.value*Math.sqrt(horizon/before.minute));
+ if(after&&horizon>=after.minute*.66)return after.value*Math.sqrt(horizon/after.minute);
  // Provisional visually honest heuristic until independent recount outcomes
  // are available for calibration. Never label this as 80% coverage.
  return (hasHistory?12:18)*Math.sqrt(horizon/60);
@@ -131,7 +133,7 @@ function project(count,trend,seasonal,now,calibration=null){
  const hour=predictions.find(x=>x.minutes===60)||predictions.find(x=>x.minutes>60)||predictions.at(-1);
  const requested=[15,30,60,120,240,480].filter(n=>n<=remaining);
  const calibrated=requested.length>0&&requested.every(n=>calibration?.horizons?.[n]?.days>=4&&calibration?.horizons?.[n]?.samples>=25);
- return {current:count,estimatedStart:count,projected:hour.count,change:hour.count-count,
+ return {modelVersion:'recount-seasonal-v4',current:count,estimatedStart:count,projected:hour.count,change:hour.count-count,
   closing:predictions.at(-1).count,points:predictions,horizonMinutes:remaining,
   confidence:support>=4?'DEVELOPING':'EARLY',matchingDays:support,
   method:'Live reported count + staff-recount historical profile',

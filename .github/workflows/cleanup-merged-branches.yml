@@ -2,17 +2,19 @@ name: Remove merged branches
 on:
   push:
     branches: [main]
-  pull_request:
-    types: [closed]
   workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: read
 
+concurrency:
+  group: merged-branch-cleanup
+  cancel-in-progress: false
+
 jobs:
   cleanup:
-    if: github.repository == 'NolanHasting/theknotcapacity' && (github.event_name != 'pull_request' || github.event.pull_request.merged == true)
+    if: github.repository == 'NolanHasting/theknotcapacity'
     runs-on: ubuntu-latest
     steps:
       - name: Delete local branches already merged into main
@@ -39,22 +41,3 @@ jobs:
             fi
           done
 
-      - name: Remove abandoned SMS prototype branch after verifying its backup
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          backup="backup/sms-prototype-2026-11-12"
-          prototype="feature/sms-alerts-only"
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$prototype" >/dev/null 2>&1; then
-            backup_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$backup" --jq '.object.sha')"
-            feature_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$prototype" --jq '.object.sha')"
-            if [ -n "$backup_sha" ] && [ "$backup_sha" = "$feature_sha" ]; then
-              gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$prototype" >/dev/null
-              echo "Removed abandoned SMS feature branch; backup preserved."
-            else
-              echo "::error::Prototype differs from backup; refusing to delete it."
-              exit 1
-            fi
-          fi
