@@ -34,9 +34,20 @@
    const n=ceiling*i/5,yy=y(n);
    html+='<line x1="'+left+'" x2="'+right+'" y1="'+yy+'" y2="'+yy+'" stroke="#292929"/><text x="'+(left-7)+'" y="'+(yy+4)+'" text-anchor="end" fill="#aaa" font-size="11">'+Math.round(n)+'</text>';
   }
-  for(let h=7;h<=23;h+=mobile?4:2){
-   html+='<text x="'+x(h*60)+'" y="'+(mobile?230:268)+'" text-anchor="middle" fill="#aaa" font-size="'+(mobile?11:10)+'">'+safe(tick(h*60))+'</text>';
-  }
+for (let h = 7; h <= 23; h += mobile ? 4 : 2) {
+  const anchor = mobile && h === 23
+    ? 'end'
+    : mobile && h === 7
+      ? 'start'
+      : 'middle';
+
+  html += '<text x="' + x(h * 60) +
+    '" y="' + (mobile ? 230 : 268) +
+    '" text-anchor="' + anchor +
+    '" fill="#aaa" font-size="' +
+    (mobile ? 11 : 10) + '">' +
+    safe(tick(h * 60)) + '</text>';
+}
   let path='',prev=null;
   for(const p of source){
    if(!Number.isFinite(p.count)){prev=null;continue;}
