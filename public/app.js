@@ -82,19 +82,45 @@ function heatColor(value){
 function renderHeat(cells){
  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
  const indexed=new Map((cells||[]).map(x=>[x.dayIndex+'-'+x.hour,x]));
- let html='<div></div>'+days.map(d=>'<div>'+d+'</div>').join('');
+ const current=$('heatmap').querySelector('.heat-cell[aria-pressed="true"]');
+ const selected=current?.dataset.key||'';
+ let markup='<div class="heat-heading heat-corner" aria-hidden="true"></div>'+
+  days.map(d=>'<div class="heat-heading">'+d+'</div>').join('');
  for(let h=7;h<23;h++){
-  html+='<div>'+hourLabel(h).replace('00 ','')+'</div>';
+  markup+='<div class="heat-hour">'+esc(hourLabel(h).replace(':00 ',' '))+'</div>';
   for(let d=0;d<7;d++){
-   const v=indexed.get(d+'-'+h);
-   const recorded=v&&Number.isFinite(v.average);
+   const v=indexed.get(d+'-'+h),recorded=v&&Number.isFinite(v.average);
    const color=recorded?heatColor(v.average):'#202020';
-   const title=recorded?`${days[d]} ${hourLabel(h)} · ${v.average} average occupants · ${v.days||0} matching days · ${v.samples} samples`:'No counts recorded for this hour';
-   html+='<div class="cell" style="background:'+color+'" title="'+esc(title)+'" aria-label="'+esc(title)+'"></div>';
+   const label=recorded?days[d]+' '+hourLabel(h)+': '+v.average+' people on average, '+(v.days||0)+' day'+(v.days===1?'':'s'):'No data for '+days[d]+' '+hourLabel(h);
+   const key=d+'-'+h;
+   markup+='<button type="button" class="heat-cell'+(selected===key?' is-selected':'')+'" style="--heat-color:'+color+
+    '" data-key="'+key+'" data-info="'+esc(label)+'" aria-label="'+esc(label)+
+    '" aria-pressed="'+(selected===key?'true':'false')+'"></button>';
   }
  }
- $('heatmap').innerHTML=html;
+ $('heatmap').innerHTML=markup;
+ // Refreshes keep the selected cell and its detail visible.
+ if(selected){
+  const chosen=Array.from($('heatmap').querySelectorAll('.heat-cell')).find(x=>x.dataset.key===selected);
+  if(chosen)$('heatDetail').textContent=chosen.dataset.info;
+ }
 }
+function inspectHeat(target,selected){
+ const cell=target?.closest?.('.heat-cell');
+ if(!cell)return;
+ $('heatDetail').textContent=cell.dataset.info;
+ if(selected){
+  $('heatmap').querySelectorAll('.heat-cell[aria-pressed="true"]').forEach(x=>{
+   x.classList.remove('is-selected');x.setAttribute('aria-pressed','false');
+  });
+  cell.classList.add('is-selected');cell.setAttribute('aria-pressed','true');
+ }
+}
+$('heatmap').addEventListener('click',e=>inspectHeat(e.target,true));
+$('heatmap').addEventListener('focusin',e=>inspectHeat(e.target,false));
+$('heatmap').addEventListener('pointerover',e=>{
+ if(e.pointerType==='mouse'||e.pointerType==='pen')inspectHeat(e.target,false);
+});
 function renderBest(items){
  const options=(items||[]).filter(x=>Number.isFinite(x.average));
  const isPrediction=x=>x.source==='forecast';
